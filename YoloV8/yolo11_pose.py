@@ -36,6 +36,6 @@ for result in results:
         print(f"Number of detections: {len(keypoints)}")
         print(f"Keypoints shape: {keypoints.shape}")
         print(f"Keypoints data: {keypoints.data}")
-
+# 수정
 # 모델 내보내기 (선택사항)
 #model.export(format="onnx", dynamic=True, simplify=True)
