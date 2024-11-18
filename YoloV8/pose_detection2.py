@@ -149,6 +149,8 @@ def main():
             print(f"Error processing {image_path}: {str(e)}")
 
     print("\n모든 이미지 처리가 완료되었습니다.")
-# alex 수정 test
+# alex 수정 test1
+# alex 수정 test2
+
 if __name__ == "__main__":
     main()
