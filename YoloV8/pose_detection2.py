@@ -151,6 +151,7 @@ def main():
     print("\n모든 이미지 처리가 완료되었습니다.")
 # alex 수정 test1
 # alex 수정 test2
+# alex 수정 test3
 
 if __name__ == "__main__":
     main()
