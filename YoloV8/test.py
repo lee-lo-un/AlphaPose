@@ -10,6 +10,8 @@ if torch.cuda.is_available():
 else:
     print("CUDA is not available. Running on CPU.")
 
+#hi im sejoon
+
 # 현재 파일의 디렉토리에서 두 단계 위로 이동하여 project_root 경로를 추가
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.append(project_root)
@@ -19,3 +21,5 @@ print(sys.path)
 
 # alphapose 패키지 가져오기
 import AlphaPose
+
+#hi im sejoon
