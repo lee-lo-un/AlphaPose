@@ -1,0 +1,16 @@
+walking
+running
+jumping
+sitting
+standing
+falling
+waving
+clapping
+pointing
+dancing
+eating
+drinking
+reading
+typing
+phone_calling
+exercising 
