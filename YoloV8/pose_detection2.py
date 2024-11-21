@@ -4,6 +4,8 @@ import cv2
 import numpy as np
 import os
 from pathlib import Path
+import json
+from datetime import datetime
 
 # COCO 데이터셋 클래스 이름 정의
 COCO_CLASSES = {
@@ -46,7 +48,7 @@ def process_image(image_path, detect_model, pose_model, output_folder):
     # 파일 이름 추출 (확장자 제외)
     image_name = Path(image_path).stem
 
-    # 물체 인식 및 포즈 추정 실행
+    # 물체 인식 ��� 포즈 추정 실행
     detect_results = detect_model(image)
     pose_results = pose_model(image)
 
@@ -66,6 +68,13 @@ def process_image(image_path, detect_model, pose_model, output_folder):
                 print(f"클래스: {cls_name}, 신뢰도: {conf:.2f}")
                 print(f"박스 좌표: {coords}")
 
+    # JSON으로 저장할 데이터 구조 생성
+    pose_data = {
+        "timestamp": datetime.now().isoformat(),
+        "image_name": image_name,
+        "people": []
+    }
+
     # 포즈 추정 결과
     print("\n포즈 추정 결과:")
     for result in pose_results:
@@ -73,11 +82,33 @@ def process_image(image_path, detect_model, pose_model, output_folder):
         if keypoints is not None:
             keypoints_data = keypoints.data.cpu().numpy()
             for person_idx, person_keypoints in enumerate(keypoints_data):
+                person_data = {
+                    "person_id": person_idx,
+                    "keypoints": []
+                }
                 print(f"\n사람 {person_idx + 1}의 키포인트:")
                 for kp_idx, kp in enumerate(person_keypoints):
                     x, y, conf = kp
                     kp_name = get_keypoint_name(kp_idx)
                     print(f"{kp_name}: x={x:.2f}, y={y:.2f}, confidence={conf:.2f}")
+                    
+                    # JSON 데이터에 키포인트 추가
+                    person_data["keypoints"].append({
+                        "name": kp_name,
+                        "id": kp_idx,
+                        "coordinates": {
+                            "x": float(x),
+                            "y": float(y)
+                        },
+                        "confidence": float(conf)
+                    })
+                pose_data["people"].append(person_data)
+
+    # JSON 파일로 저장
+    json_output_path = os.path.join(output_folder, f'{image_name}_pose.json')
+    with open(json_output_path, 'w', encoding='utf-8') as f:
+        json.dump(pose_data, f, ensure_ascii=False, indent=2)
+    print(f"포즈 데이터 JSON 저장됨: {json_output_path}")
 
     # 결과 시각화
     img = image.copy()
@@ -110,6 +141,66 @@ def process_image(image_path, detect_model, pose_model, output_folder):
     output_path = os.path.join(output_folder, f'{image_name}_result.jpg')
     cv2.imwrite(output_path, img)
     print(f"결과 이미지 저장됨: {output_path}")
+
+def initialize_models():
+    """모델 초기화"""
+    detect_model = YOLO('inference/yolo11l.pt')
+    pose_model = YOLO('inference/yolo11l-pose.pt')
+    return detect_model, pose_model
+
+def process_realtime(frame, detect_model, pose_model):
+    with torch.cuda.amp.autocast():
+        with torch.inference_mode():
+            # YOLO 처리
+            detect_results = detect_model(frame, conf=0.5)  # 신뢰도 임계값 설정
+            pose_results = pose_model(frame, conf=0.5)
+            
+            # 결과 처리
+            results = {
+                'objects': [],
+                'poses': []
+            }
+            
+            # 객체 감지 결과 처리
+            for result in detect_results:
+                boxes = result.boxes
+                for box in boxes:
+                    cls = int(box.cls[0])
+                    cls_name = COCO_CLASSES.get(cls, f"class_{cls}")
+                    conf = float(box.conf[0])
+                    coords = box.xyxy[0].cpu().numpy()
+                    
+                    results['objects'].append({
+                        'class': cls_name,
+                        'confidence': conf,
+                        'bbox': coords.tolist()
+                    })
+            
+            # 포즈 추정 결과 처리
+            for result in pose_results:
+                keypoints = result.keypoints
+                if keypoints is not None:
+                    keypoints_data = keypoints.data.cpu().numpy()
+                    for person_idx, person_keypoints in enumerate(keypoints_data):
+                        person_data = {
+                            'person_id': person_idx,
+                            'keypoints': []
+                        }
+                        
+                        for kp_idx, kp in enumerate(person_keypoints):
+                            x, y, conf = kp
+                            kp_name = get_keypoint_name(kp_idx)
+                            person_data['keypoints'].append({
+                                'name': kp_name,
+                                'coordinates': {
+                                    'x': float(x),
+                                    'y': float(y)
+                                },
+                                'confidence': float(conf)
+                            })
+                        results['poses'].append(person_data)
+            
+            return results
 
 def main():
     # GPU 사용 가능 여부 확인

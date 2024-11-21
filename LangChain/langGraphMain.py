@@ -1,183 +1,185 @@
-from typing import Dict, TypedDict, List, Tuple, Any, Optional
-from langchain_core.messages import BaseMessage, HumanMessage, AIMessage
-from langgraph.graph import Graph, MessageGraph
-from langchain_core.runnables import RunnablePassthrough
+from typing import TypedDict, Annotated, Sequence, Dict, Any
+from langchain_core.messages import BaseMessage
+from langgraph.graph import StateGraph
+from langchain_core.messages import HumanMessage, AIMessage
 from langchain_openai import ChatOpenAI
-from neo4j import GraphDatabase  # Neo4j 직접 사용
-from langchain_core.output_parsers import StrOutputParser
-import logging
+from langchain.prompts import ChatPromptTemplate
+import os
+from dotenv import load_dotenv
+import cv2
+import numpy as np
+import threading
+from screeninfo import get_monitors  # pip install screeninfo
 
-# 로깅 설정
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
 
-# 상태 타입 정의
+# 환경 변수 로드
+load_dotenv()
+
+# OpenAI API 키 가져오기
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+if not OPENAI_API_KEY:
+    raise ValueError("OPENAI_API_KEY가 설정되지 않았습니다. .env 파일을 확인해주세요.")
+
+# LLM 모델 초기화
+llm = ChatOpenAI(model="gpt-3.5-turbo")
+
 class GraphState(TypedDict):
-    messages: List[BaseMessage]
-    context: List[str]
-    skeleton_features: Dict[str, Any]
+    messages: Annotated[Sequence[BaseMessage], "채팅 이력"]
+    skeleton_data: Dict
+    extracted_features: Dict
+    context: Dict
+    knowledge_graph: Dict
     current_action: str
-    neo4j_results: List[Dict]
-    final_response: str
 
-# Neo4j 클래스 추가
-class Neo4jConnection:
-    def __init__(self, uri, user, password):
-        self.driver = GraphDatabase.driver(uri, auth=(user, password))
-        
-    def close(self):
-        self.driver.close()
-        
-    def query(self, query, parameters=None):
-        with self.driver.session() as session:
-            result = session.run(query, parameters or {})
-            return [record.data() for record in result]
-
-# 특징 추출 노드
-def process_skeleton_features(state: GraphState) -> GraphState:
-    """스켈레톤 특징을 처리하고 텍스트화"""
-    features = state["skeleton_features"]
-    processed_features = {
-        "joint_angles": features.get("angles", {}),
-        "distances": features.get("distances", {}),
-        "object_relations": features.get("relations", {})
-    }
-    state["context"].append(f"스켈레톤 특징: {processed_features}")
-    return state
-# Neo4j 검색 노드
-def search_similar_actions(state: GraphState) -> GraphState:
-    """유사 행동 패턴 검색"""
+def extract_features(state: Dict) -> Dict:
+    """스켈레톤 데이터로부터 중요 특징을 추출"""
     try:
-        # Neo4j 연결 설정
-        neo4j_conn = Neo4jConnection(
-            uri="neo4j://localhost:7687",
-            user="neo4j",
-            password="your_password"
-        )
+        skeleton = state['skeleton_data']
+        print("스켈레톤 데이터 분석 중...")
         
-        features = state["skeleton_features"]
-        # 실제 벡터 검색 쿼리 구현
-        query = """
-        MATCH (a:Action)
-        WHERE ... // 벡터 유사도 검색 조건
-        RETURN a
-        LIMIT 5
-        """
+        # 모든 관절 데이터 가져오기
+        left_wrist = skeleton.get('left_wrist', {})
+        right_wrist = skeleton.get('right_wrist', {})
+        left_elbow = skeleton.get('left_elbow', {})
+        right_elbow = skeleton.get('right_elbow', {})
+        left_shoulder = skeleton.get('left_shoulder', {})
+        right_shoulder = skeleton.get('right_shoulder', {})
         
-        state["neo4j_results"] = neo4j_conn.query(query)
-        neo4j_conn.close()
+        # 손목 간 거리 계산
+        wrist_distance = ((left_wrist.get('x', 0) - right_wrist.get('x', 0)) ** 2 + 
+                         (left_wrist.get('y', 0) - right_wrist.get('y', 0)) ** 2) ** 0.5
         
+        # 팔꿈치 각도 계산
+        try:
+            left_elbow_angle = calculate_angle(
+                left_shoulder.get('x', 0), left_shoulder.get('y', 0),
+                left_elbow.get('x', 0), left_elbow.get('y', 0),
+                left_wrist.get('x', 0), left_wrist.get('y', 0)
+            )
+            right_elbow_angle = calculate_angle(
+                right_shoulder.get('x', 0), right_shoulder.get('y', 0),
+                right_elbow.get('x', 0), right_elbow.get('y', 0),
+                right_wrist.get('x', 0), right_wrist.get('y', 0)
+            )
+        except Exception as angle_error:
+            print(f"각도 계산 중 오류: {angle_error}")
+            left_elbow_angle = 0
+            right_elbow_angle = 0
+        
+        features = {
+            "손목_간_거리": f"{wrist_distance:.2f}",
+            "왼쪽_팔꿈치_각도": f"{left_elbow_angle:.2f}",
+            "오른쪽_팔꿈치_각도": f"{right_elbow_angle:.2f}",
+            "자세_특징": "양팔을 앞으로 뻗은 자세" if wrist_distance < 50 else "양팔을 벌린 자세"
+        }
+        
+        state['extracted_features'] = features
+        print(f"추출된 특징: {features}")
+        return state
     except Exception as e:
-        print(f"Neo4j 검색 중 오류 발생: {e}")
-        state["neo4j_results"] = []
+        print(f"특징 추출 중 오류 발생: {e}")
+        print(f"현재 스켈레톤 데이터: {skeleton}")  # 디버깅을 위한 데이터 출력
+        raise e
+
+def calculate_angle(x1, y1, x2, y2, x3, y3):
+    """세 점 사이의 각도 계산"""
+    import math
+    
+    # 벡터 계산
+    vector1 = [x2 - x1, y2 - y1]
+    vector2 = [x3 - x2, y3 - y2]
+    
+    # 내적 계산
+    dot_product = vector1[0] * vector2[0] + vector1[1] * vector2[1]
+    
+    # 벡터의 크기 계산
+    magnitude1 = math.sqrt(vector1[0]**2 + vector1[1]**2)
+    magnitude2 = math.sqrt(vector2[0]**2 + vector2[1]**2)
+    
+    # 각도 계산 (라디안)
+    cos_angle = dot_product / (magnitude1 * magnitude2)
+    angle = math.acos(min(1, max(-1, cos_angle)))
+    
+    # 각도를 도(degree)로 변환
+    return math.degrees(angle)
+
+def generate_gpt_interpretation(state: Dict) -> Dict:
+    """특징을 바탕으로 GPT 해석 요청"""
+    try:
+        print("\nGPT를 통한 동작 해석 중...")
         
-    return state
+        features_str = "\n".join([f"{k}: {v}" for k, v in state['extracted_features'].items()])
+        
+        prompt = ChatPromptTemplate.from_messages([
+            ("system", "당신은 인간의 동작을 분석하는 전문가입니다. 주어진 스켈레톤 데이터의 특징을 바탕으로 현재 동작을 해석해주세요."),
+            ("user", f"다음 특징들을 분석하여 현재 동작을 설명해주세요:\n{features_str}")
+        ])
+        
+        chain = prompt | llm
+        response = chain.invoke({"features": features_str})
+        
+        state['current_action'] = response.content
+        print(f"GPT 해석 결과: {response.content}")
+        return state
+    except Exception as e:
+        print(f"GPT 해석 중 오류 발생: {e}")
+        raise e
 
-# GPT 해석 노드
-def interpret_action(state: GraphState) -> GraphState:
-    """행동 해석"""
-    llm = ChatOpenAI(temperature=0)
-    
-    context = "\n".join(state["context"])
-    neo4j_context = "\n".join([str(r) for r in state["neo4j_results"]])
-    
-    prompt = f"""
-    주어진 스켈레톤 데이터와 과거 유사 행동 기록을 바탕으로 현재 행동을 분석해주세요.
-    
-    [스켈레톤 데이터]
-    {context}
-    
-    [과거 유사 행동]
-    {neo4j_context}
-    
-    분석 시 다음 사항을 고려해주세요:
-    1. 관절 각도와 거리 정보의 의미
-    2. 신체 부위간의 상대적 위치 관계
-    3. 과거 유사 행동과의 연관성
-    4. 가능한 행동의 의도나 목적
-    
-    상세한 행동 설명을 제공해주세요.
-    """
-    
-    response = llm.invoke(prompt)
-    state["current_action"] = response.content
-    return state
+def update_knowledge_graph(state: Dict) -> Dict:
+    """Neo4j 지식 그래프 업데이트"""
+    try:
+        print("\n지식 그래프 업데이트 중...")
+        action = state['current_action']
+        features = state['extracted_features']
+        
+        # 여기에 Neo4j 업데이트 로직 구현
+        print(f"동작 '{action}' 지식 그래프에 저장됨")
+        return state
+    except Exception as e:
+        print(f"지식 그래프 업데이트 중 오류 발생: {e}")
+        return state
 
-# 맥락 통합 노드
-def integrate_context(state: GraphState) -> GraphState:
-    """맥락 정보 통합"""
-    llm = ChatOpenAI(temperature=0)
-    
-    prompt = f"""
-    다음 정보들을 통합하여 최종 상황을 해석해주세요:
-    
-    현재 행동: {state["current_action"]}
-    스켈레톤 특징: {state["context"]}
-    유사 행동 기록: {state["neo4j_results"]}
-    """
-    
-    response = llm.invoke(prompt)
-    state["final_response"] = response.content
-    return state
-
-# 그래프 구성
-def create_graph() -> Graph:
-    # 워크플로우 정의
-    workflow = Graph()
+def create_workflow() -> StateGraph:
+    workflow = StateGraph(GraphState)
     
     # 노드 추가
-    workflow.add_node("process_features", process_skeleton_features)
-    workflow.add_node("search_actions", search_similar_actions)
-    workflow.add_node("interpret", interpret_action)
-    workflow.add_node("integrate", integrate_context)
+    workflow.add_node("extract", extract_features)
+    workflow.add_node("interpret", generate_gpt_interpretation)
+    workflow.add_node("update", update_knowledge_graph)
     
-    # 엣지 연결
-    workflow.add_edge("process_features", "search_actions")
-    workflow.add_edge("search_actions", "interpret")
-    workflow.add_edge("interpret", "integrate")
+    # 순차적 실행을 위한 엣지 연결
+    workflow.add_edge("extract", "interpret")
+    workflow.add_edge("interpret", "update")
+    
+    # 시작 노드 설정
+    workflow.set_entry_point("extract")
     
     return workflow.compile()
 
-# 실행 함수
-def run_rag_system(skeleton_features: Dict[str, Any]) -> Optional[str]:
-    """RAG 시스템 실행"""
+def show_graph_popup_cv2(app):
     try:
-        graph = create_graph()
+        def show_image():
+            graph_image = app.get_graph(xray=True).draw_mermaid_png()
+            image_array = np.frombuffer(graph_image, np.uint8)
+            image = cv2.imdecode(image_array, cv2.IMREAD_COLOR)
+            
+            window_name = 'Workflow Graph'
+            cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
+            cv2.imshow(window_name, image)
+            
+            while True:
+                if cv2.waitKey(1) & 0xFF == 27:
+                    break
+                if cv2.getWindowProperty(window_name, cv2.WND_PROP_VISIBLE) < 1:
+                    break
+            
+            cv2.destroyAllWindows()
+
+        # 일반 스레드 사용
+        thread = threading.Thread(target=show_image, daemon=False)
+        thread.start()
         
-        initial_state = GraphState(
-            messages=[],
-            context=[],
-            skeleton_features=skeleton_features,
-            current_action="",
-            neo4j_results=[],
-            final_response=""
-        )
-        
-        logger.info("그래프 실행 시작")
-        final_state = graph.invoke(initial_state)
-        logger.info("그래프 실행 완료")
-        
-        return final_state["final_response"]
+        print("그래프 창이 표시되었습니다. ESC 키를 누르거나 창을 닫으면 종료됩니다.")
         
     except Exception as e:
-        logger.error(f"RAG 시스템 실행 중 오류 발생: {e}")
-        return None
-
-# 사용 예시
-if __name__ == "__main__":
-    # 테스트용 스켈레톤 특징
-    test_features = {
-        "angles": {
-            "elbow_angle": 90,
-            "wrist_distance": 10
-        },
-        "distances": {
-            "hands_distance": 15
-        },
-        "relations": {
-            "hand_position": "above_head"
-        }
-    }
-    
-    result = run_rag_system(test_features)
-    print("최종 해석:", result)
+        print(f"이미지 표시 중 오류 발생: {e}")
