@@ -65,25 +65,41 @@ async def process_frame(frame):
     """프레임 처리를 위한 비동기 함수"""
     loop = asyncio.get_event_loop()
     
-    # YOLO 처리 시작
+    # YOLO 처리 (스켈레톤 데이터)
     yolo_start = time.time()
     results = await loop.run_in_executor(
         executor, 
         lambda: process_realtime(frame, detect_model, pose_model)
     )
     yolo_time = time.time() - yolo_start
+
+    # 스켈레톤 데이터를 즉시 전송하기 위한 초기 결과
+    initial_response = {
+        'timestamp': str(pd.Timestamp.now()),
+        'detection_results': results,
+        'action_recognition': None
+    }
     
-    # ST-GCN++ 처리
-    stgcn_start = time.time()
-    action_result = None
+    # ST-GCN++ 처리는 별도의 태스크로 실행
     if results.get('poses'):
+        stgcn_start = time.time()
         action_result = await loop.run_in_executor(
             executor,
             lambda: stgcn_processor.recognize_action(results['poses'][0])
         )
-    stgcn_time = time.time() - stgcn_start
+        stgcn_time = time.time() - stgcn_start
+        
+        # 동작 인식 결과 디버깅
+        if action_result:
+            print("\n=== 동작 인식 결과 ===")
+            print(f"인식된 동작: {action_result['action']}")
+            print(f"신뢰도: {action_result['confidence']*100:.1f}%")
+            print("="*30)
+            initial_response['action_recognition'] = action_result
+    else:
+        stgcn_time = 0
     
-    return results, action_result, yolo_time, stgcn_time
+    return initial_response, yolo_time, stgcn_time
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
@@ -103,17 +119,11 @@ async def websocket_endpoint(websocket: WebSocket):
             frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
             receive_time = time.time() - receive_start
 
-            # 프레임 처리
             try:
-                results, action_result, yolo_time, stgcn_time = await process_frame(frame)
+                # 프레임 처리 및 결과 전송
+                response_data, yolo_time, stgcn_time = await process_frame(frame)
                 
-                # 결과 전송
                 send_start = time.time()
-                response_data = {
-                    'timestamp': str(pd.Timestamp.now()),
-                    'detection_results': results,
-                    'action_recognition': action_result
-                }
                 await websocket.send_json(response_data)
                 send_time = time.time() - send_start
                 
@@ -130,6 +140,15 @@ async def websocket_endpoint(websocket: WebSocket):
                     print(f"4. 결과 전송 시간: {send_time*1000:.2f}ms")
                     print(f"총 처리 시간: {total_time*1000:.2f}ms")
                     print(f"현재 FPS: {1/total_time:.2f}")
+                    
+                    # 동작 인식 결과 출력
+                    if response_data.get('action_recognition'):
+                        action = response_data['action_recognition']
+                        print(f"인식된 동작: {action['action']}")
+                        print(f"신뢰도: {action['confidence']*100:.1f}%")
+                    else:
+                        print("동작 인식 결과 없음")
+                        
                     print("="*30)
                 
             except Exception as e:

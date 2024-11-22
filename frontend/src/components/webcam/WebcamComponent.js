@@ -61,6 +61,8 @@ const WebcamComponent = () => {
           type: 'image/jpeg'
         });
         wsRef.current.send(blob);
+        
+        console.log('Frame captured:', new Date().toISOString());
       } else {
         processingRef.current = false;
       }
@@ -69,9 +71,18 @@ const WebcamComponent = () => {
 
   useEffect(() => {
     let interval;
+    let lastCaptureTime = 0;
+    
     if (!isAnalyzing) {
-      interval = setInterval(captureFrame, 50);
+      interval = setInterval(() => {
+        const currentTime = Date.now();
+        if (currentTime - lastCaptureTime >= 28) {
+          captureFrame();
+          lastCaptureTime = currentTime;
+        }
+      }, 10);
     }
+    
     return () => {
       if (interval) {
         clearInterval(interval);
@@ -91,7 +102,7 @@ const WebcamComponent = () => {
           width: 1280,
           height: 720,
           facingMode: "user",
-          frameRate: 20
+          frameRate: 30
         }}
       />
       
