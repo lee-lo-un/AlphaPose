@@ -1,91 +1,64 @@
-import sys
-import os
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
+import base64
+from io import BytesIO
+from PIL import Image
+import numpy as np
 from LangChain.action_recognition import ActionRecognitionSystem
-from typing import Dict
-import json
+from YoloV8.pose_detection2 import process_realtime, initialize_models
+import traceback
 
-def load_sample_skeleton_data() -> Dict:
-    # 테스트용 샘플 스켈레톤 데이터 로드
-    # 테스트용 스켈레톤 데이터 로드
-    sample_data = {
-        "keypoints": {
-            "nose": {"x": 503.59, "y": 124.42, "z": 0},
-            "left_eye": {"x": 518.95, "y": 118.19, "z": 0},
-            "right_eye": {"x": 497.36, "y": 111.70, "z": 0},
-            "left_ear": {"x": 530.24, "y": 131.10, "z": 0},
-            "right_ear": {"x": 478.64, "y": 113.53, "z": 0},
-            "left_shoulder": {"x": 521.31, "y": 187.03, "z": 0},
-            "right_shoulder": {"x": 459.42, "y": 172.57, "z": 0},
-            "left_elbow": {"x": 569.56, "y": 255.82, "z": 0},
-            "right_elbow": {"x": 473.57, "y": 254.18, "z": 0},
-            "left_wrist": {"x": 614.14, "y": 308.04, "z": 0},
-            "right_wrist": {"x": 513.67, "y": 318.28, "z": 0},
-            "left_hip": {"x": 484.53, "y": 324.26, "z": 0},
-            "right_hip": {"x": 444.36, "y": 322.53, "z": 0},
-            "left_knee": {"x": 539.80, "y": 420.43, "z": 0},
-            "right_knee": {"x": 525.52, "y": 420.28, "z": 0},
-            "left_ankle": {"x": 511.02, "y": 547.56, "z": 0},
-            "right_ankle": {"x": 492.88, "y": 548.00, "z": 0},
-        },
-        "confidence_scores": {
-            "nose": 0.995,
-            "left_eye": 0.956,
-            "right_eye": 0.984,
-            "left_ear": 0.607,
-            "right_ear": 0.893,
-            "left_shoulder": 0.996,
-            "right_shoulder": 0.998,
-            "left_elbow": 0.980,
-            "right_elbow": 0.994,
-            "left_wrist": 0.983,
-            "right_wrist": 0.995,
-            "left_hip": 0.998,
-            "right_hip": 0.999,
-            "left_knee": 0.996,
-            "right_knee": 0.997,
-            "left_ankle": 0.975,
-            "right_ankle": 0.980,
-        }
-    }
+app = FastAPI()
 
-    return sample_data["keypoints"]  # keypoints만 반환
+class ImageData(BaseModel):
+    image: str
 
-def main():
+# 모델 초기화
+detect_model, pose_model = initialize_models()
+action_recognition_system = ActionRecognitionSystem()
+
+@app.post("/analyze")
+async def analyze_image(data: ImageData):
     try:
-        # 시스템 초기화
-        print("행동 인식 시스템을 초기화합니다...")
-        system = ActionRecognitionSystem()
-        
-        # 스켈레톤 데이터 로드
-        print("스켈레톤 데이터를 로드합니다...")
-        skeleton_data = load_sample_skeleton_data()
-        
-        # 행동 분석
-        print("행동을 분석합니다...")
-        result = system.process_skeleton_data(skeleton_data)
-        
-        # 결과 출력
-        if result:
-            print(f"\n인식된 행동: {result}")
-            
+        # 1. Base64 이미지 디코딩
+        image_data = data.image.split(",")[1]
+        image = Image.open(BytesIO(base64.b64decode(image_data)))
+        image_np = np.array(image)
+
+        # 2. 스켈레톤 및 객체 데이터 추출
+        print("스켈레톤 및 객체 데이터를 추출합니다...")
+        results = process_realtime(image_np, detect_model, pose_model)
+        skeleton_data = results.get('poses', [])
+        object_data = results.get('objects', [])
+
+        # 3. 행동 인식 (스켈레톤 데이터가 있을 경우)
+        if skeleton_data:
+            print("행동을 분석합니다...")
+            action_result = action_recognition_system.process_skeleton_data(skeleton_data[0])
+
             # 유사 행동 검색
-            print("\n유사한 행동을 검색합니다...")
-            similar_actions = system.get_similar_actions(result)
-            if similar_actions:
-                print("유사한 행동들:")
-                for action in similar_actions:
-                    print(f"- {action}")
-            else:
-                print("유사한 행동을 찾을 수 없습니다.")
+            print("유사 행동을 검색합니다...")
+            similar_actions = (
+                action_recognition_system.get_similar_actions(action_result)
+                if action_result else []
+            )
+
+            # 결과 반환
+            return {
+                "skeleton_data": skeleton_data,
+                "object_data": object_data,
+                "action_result": action_result,
+                "similar_actions": similar_actions,
+            }
         else:
-            print("\n행동 인식에 실패했습니다.")
-            
+            # 스켈레톤 데이터가 없을 경우
+            return {
+                "skeleton_data": skeleton_data,
+                "object_data": object_data,
+                "action_result": None,
+                "similar_actions": [],
+            }
     except Exception as e:
         print(f"오류가 발생했습니다: {str(e)}")
-        import traceback
         print(traceback.format_exc())
-
-if __name__ == "__main__":
-    main()
+        raise HTTPException(status_code=500, detail=str(e))
