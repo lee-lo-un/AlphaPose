@@ -7,25 +7,49 @@ from typing import Dict
 import json
 
 def load_sample_skeleton_data() -> Dict:
-    """테스트용 샘플 스켈레톤 데이터 로드"""
+    # 테스트용 샘플 스켈레톤 데이터 로드
+    # 테스트용 스켈레톤 데이터 로드
     sample_data = {
         "keypoints": {
-            "left_wrist": {"x": 100, "y": 150, "z": 0},
-            "right_wrist": {"x": 120, "y": 155, "z": 0},
-            "left_elbow": {"x": 80, "y": 120, "z": 0},
-            "right_elbow": {"x": 140, "y": 125, "z": 0},
-            "left_shoulder": {"x": 60, "y": 100, "z": 0},
-            "right_shoulder": {"x": 160, "y": 100, "z": 0}
+            "nose": {"x": 503.59, "y": 124.42, "z": 0},
+            "left_eye": {"x": 518.95, "y": 118.19, "z": 0},
+            "right_eye": {"x": 497.36, "y": 111.70, "z": 0},
+            "left_ear": {"x": 530.24, "y": 131.10, "z": 0},
+            "right_ear": {"x": 478.64, "y": 113.53, "z": 0},
+            "left_shoulder": {"x": 521.31, "y": 187.03, "z": 0},
+            "right_shoulder": {"x": 459.42, "y": 172.57, "z": 0},
+            "left_elbow": {"x": 569.56, "y": 255.82, "z": 0},
+            "right_elbow": {"x": 473.57, "y": 254.18, "z": 0},
+            "left_wrist": {"x": 614.14, "y": 308.04, "z": 0},
+            "right_wrist": {"x": 513.67, "y": 318.28, "z": 0},
+            "left_hip": {"x": 484.53, "y": 324.26, "z": 0},
+            "right_hip": {"x": 444.36, "y": 322.53, "z": 0},
+            "left_knee": {"x": 539.80, "y": 420.43, "z": 0},
+            "right_knee": {"x": 525.52, "y": 420.28, "z": 0},
+            "left_ankle": {"x": 511.02, "y": 547.56, "z": 0},
+            "right_ankle": {"x": 492.88, "y": 548.00, "z": 0},
         },
         "confidence_scores": {
-            "left_wrist": 0.95,
-            "right_wrist": 0.93,
-            "left_elbow": 0.97,
-            "right_elbow": 0.96,
-            "left_shoulder": 0.98,
-            "right_shoulder": 0.98
+            "nose": 0.995,
+            "left_eye": 0.956,
+            "right_eye": 0.984,
+            "left_ear": 0.607,
+            "right_ear": 0.893,
+            "left_shoulder": 0.996,
+            "right_shoulder": 0.998,
+            "left_elbow": 0.980,
+            "right_elbow": 0.994,
+            "left_wrist": 0.983,
+            "right_wrist": 0.995,
+            "left_hip": 0.998,
+            "right_hip": 0.999,
+            "left_knee": 0.996,
+            "right_knee": 0.997,
+            "left_ankle": 0.975,
+            "right_ankle": 0.980,
         }
     }
+
     return sample_data["keypoints"]  # keypoints만 반환
 
 def main():
