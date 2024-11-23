@@ -36,9 +36,8 @@ export default function HomePage() {
               <Image
                 src="/images/logo.png"
                 alt="logo"
-                width={200}
-                height={200}
-                className="object-contain"
+                fill
+                className="object-contain w-[200px] h-auto"
               />
             </div>
           </div>
