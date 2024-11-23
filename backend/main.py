@@ -87,7 +87,7 @@ async def analyze_image(data: ImageData):
         print("====skeleton_data: ", skeleton_data)
         print("skeleton_data['keypoints']: ", skeleton_data["keypoints"])
         if skeleton_data:
-            action_result = action_recognition_system.process_skeleton_data(skeleton_data["keypoints"])
+            action_result = action_recognition_system.process_skeleton_data(skeleton_data["keypoints"],object_data), 
             if action_result:
                 similar_actions = action_recognition_system.get_similar_actions(action_result)
         #response_data, yolo_time = await process_frame(1)
@@ -192,6 +192,18 @@ async def websocket_endpoint(websocket: WebSocket):
         traceback.print_exc()
     finally:
         print("WebSocket 연결 종료")
+
+class TextData(BaseModel):
+    text: str
+
+@app.post("/process_text")
+async def process_text(data: TextData):
+    try:
+        # 여기에 텍스트 처리 로직 추가
+        print(f"받은 텍스트: {data.text}")
+        return {"status": "success", "message": "텍스트가 성공적으로 처리되었습니다."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
     import uvicorn
