@@ -7,9 +7,8 @@ module.exports = {
   ],
   theme: {
     extend: {
-      colors: {
-        background: "var(--background)",
-        foreground: "var(--foreground)",
+      rotate: {
+        '135': '135deg',
       },
     },
   },
