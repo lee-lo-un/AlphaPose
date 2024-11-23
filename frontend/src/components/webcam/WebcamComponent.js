@@ -5,18 +5,27 @@ import dynamic from 'next/dynamic';
 
 const Webcam = dynamic(() => import('react-webcam'), {
   ssr: false,
-  loading: () => <div className="w-full h-[720px] bg-gray-200 rounded-lg flex items-center justify-center">카메라 로딩중...</div>
+  loading: () => (
+    <div className="w-full h-[720px] bg-gray-200 rounded-lg flex items-center justify-center">
+      카메라 로딩중...
+    </div>
+  ),
 });
 
 const WebcamComponent = () => {
   const webcamRef = useRef(null);
   const wsRef = useRef(null);
   const [isConnected, setIsConnected] = useState(false);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [detectionResult, setDetectionResult] = useState(null);
-  const processingRef = useRef(false);
+  const [fps, setFps] = useState(0);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
 
-  useEffect(() => {
+  const processingRef = useRef(false);
+  const lastTimestamp = useRef(0);
+
+  const connectWebSocket = () => {
+    if (wsRef.current?.readyState === WebSocket.OPEN) return;
+
     wsRef.current = new WebSocket('ws://localhost:8000/ws');
     
     wsRef.current.onopen = () => {
@@ -25,70 +34,97 @@ const WebcamComponent = () => {
     };
 
     wsRef.current.onmessage = (event) => {
+      console.log('WebSocket 메시지 수신:', event.data);
       const data = JSON.parse(event.data);
+      console.log('Detection 결과 업데이트:', data); // 상태 업데이트 확인
       setDetectionResult(data);
       processingRef.current = false;
     };
 
-    wsRef.current.onerror = (error) => {
-      console.error('WebSocket error:', error);
+    wsRef.current.onerror = () => {
+      console.log('WebSocket connection error');
+      setIsConnected(false);
       processingRef.current = false;
     };
 
     wsRef.current.onclose = () => {
-      setIsConnected(false);
       console.log('WebSocket Disconnected');
+      setIsConnected(false);
       processingRef.current = false;
+      setTimeout(connectWebSocket, 3000);
     };
+  };
+
+  useEffect(() => {
+    connectWebSocket();
 
     return () => {
-      wsRef.current?.close();
+      if (wsRef.current) {
+        wsRef.current.close();
+      }
     };
   }, []);
 
-  const captureFrame = () => {
-    if (webcamRef.current && wsRef.current && 
-        isConnected && !isAnalyzing && 
-        !processingRef.current && 
-        wsRef.current.readyState === WebSocket.OPEN) {
-      
+  const captureFrame = async () => {
+    if (
+      webcamRef.current &&
+      wsRef.current &&
+      isConnected &&
+      !processingRef.current &&
+      wsRef.current.readyState === WebSocket.OPEN
+    ) {
       processingRef.current = true;
       const imageSrc = webcamRef.current.getScreenshot();
-      
       if (imageSrc) {
         const base64Data = imageSrc.split(',')[1];
         const blob = new Blob([Uint8Array.from(atob(base64Data), c => c.charCodeAt(0))], {
-          type: 'image/jpeg'
+          type: 'image/jpeg',
         });
         wsRef.current.send(blob);
-        
-        console.log('Frame captured:', new Date().toISOString());
+        console.log('Frame sent:', new Date().toISOString());
       } else {
         processingRef.current = false;
       }
     }
   };
 
-  useEffect(() => {
-    let interval;
-    let lastCaptureTime = 0;
-    
-    if (!isAnalyzing) {
-      interval = setInterval(() => {
-        const currentTime = Date.now();
-        if (currentTime - lastCaptureTime >= 28) {
-          captureFrame();
-          lastCaptureTime = currentTime;
+  const analyzeImage = async () => {
+    if (webcamRef.current) {
+      const imageSrc = webcamRef.current.getScreenshot();
+      if (imageSrc) {
+        setIsAnalyzing(true);
+        try {
+          const response = await fetch('http://localhost:8000/analyze', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ image: imageSrc }),
+          });
+
+          if (!response.ok) {
+            throw new Error('Network response was not ok');
+          }
+
+          const data = await response.json();
+          console.log('분석 결과:', data);
+        } catch (error) {
+          console.error('Error analyzing image:', error);
+        } finally {
+          setIsAnalyzing(false);
         }
-      }, 10);
-    }
-    
-    return () => {
-      if (interval) {
-        clearInterval(interval);
       }
-    };
-  }, [isConnected, isAnalyzing]);
+    }
+  };
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (!processingRef.current) {
+        captureFrame();
+      }
+    }, 30); // 30ms 간격으로 시도
+    return () => clearInterval(interval);
+  }, [isConnected]);
 
   return (
     <div className="relative w-full max-w-4xl">
@@ -101,15 +137,13 @@ const WebcamComponent = () => {
         videoConstraints={{
           width: 1280,
           height: 720,
-          facingMode: "user",
-          frameRate: 30
+          facingMode: 'user',
+          frameRate: 30,
         }}
       />
-      
-      {/* 결과 표시 */}
+
       {detectionResult && (
         <div className="absolute top-0 left-0 w-full h-full pointer-events-none">
-          {/* 객체 감지 결과 */}
           {detectionResult.detection_results.objects.map((obj, idx) => (
             <div
               key={`box-${idx}`}
@@ -126,8 +160,6 @@ const WebcamComponent = () => {
               </span>
             </div>
           ))}
-
-          {/* 포즈 추정 결과 */}
           {detectionResult.detection_results.poses.map((pose, personIdx) => (
             <div key={`pose-${personIdx}`}>
               {pose.keypoints.map((kp, idx) => (
@@ -143,24 +175,15 @@ const WebcamComponent = () => {
               ))}
             </div>
           ))}
-
-          {/* 동작 인식 결과 */}
-          {detectionResult.action_recognition && (
-            <div className="absolute top-16 right-4 bg-blue-500 text-white px-4 py-2 rounded">
-              동작: {detectionResult.action_recognition.action}
-              <br />
-              신뢰도: {(detectionResult.action_recognition.confidence * 100).toFixed(1)}%
-            </div>
-          )}
         </div>
       )}
-      
-      {/* 컨트롤 */}
+
       <div className="absolute top-4 right-4 space-y-2">
-        <div className={`px-3 py-1 rounded text-sm ${
-          isConnected ? 'bg-green-500' : 'bg-red-500'
-        } text-white`}>
+        <div className={`px-3 py-1 rounded text-sm ${isConnected ? 'bg-green-500' : 'bg-red-500'} text-white`}>
           {isConnected ? '연결됨' : '연결 안됨'}
+        </div>
+        <div className="text-sm bg-gray-500 text-white px-3 py-1 rounded">
+          FPS: {fps}
         </div>
         <button
           className={`w-full px-4 py-2 rounded font-bold ${
@@ -168,10 +191,7 @@ const WebcamComponent = () => {
               ? 'bg-gray-500 text-white'
               : 'bg-blue-500 hover:bg-blue-700 text-white'
           }`}
-          onClick={() => {
-            setIsAnalyzing(true);
-            setTimeout(() => setIsAnalyzing(false), 1000);
-          }}
+          onClick={analyzeImage}
           disabled={isAnalyzing}
         >
           {isAnalyzing ? '분석 중...' : '분석'}
@@ -181,4 +201,4 @@ const WebcamComponent = () => {
   );
 };
 
-export default WebcamComponent; 
+export default WebcamComponent;
