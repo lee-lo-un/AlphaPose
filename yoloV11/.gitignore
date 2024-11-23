@@ -1,0 +1,15 @@
+/img
+
+# Python cache files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Model checkpoints
+checkpoints/
+*.pt
+*.pth
+
+# Output files
+/outputs
+*.json

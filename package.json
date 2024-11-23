@@ -1,5 +1,11 @@
 {
   "dependencies": {
     "react-webcam": "^7.2.0"
+  },
+  "scripts": {
+    "dev": "set NODE_ENV=development && next dev --hostname 0.0.0.0",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
   }
 }
