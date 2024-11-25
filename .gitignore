@@ -11,3 +11,4 @@ ENV/
 
 # Logs
 *.log
+/logs/*

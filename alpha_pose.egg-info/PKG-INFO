@@ -1,0 +1,14 @@
+Metadata-Version: 2.1
+Name: alpha-pose
+Version: 0.1
+Summary: Action recognition system using pose estimation and LangChain
+Home-page: UNKNOWN
+Author: leeloun
+Author-email: leeloun@naver.com
+License: UNKNOWN
+Keywords: pose-estimation,action-recognition,langchain,yolo
+Platform: UNKNOWN
+Requires-Python: >=3.9
+
+UNKNOWN
+

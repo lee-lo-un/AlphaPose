@@ -32,7 +32,8 @@ class GraphState(TypedDict):
     context: Dict
     knowledge_graph: Dict
     current_action: str
-
+    yolo_objects: list[Dict]
+    st_gcn_result: list[str]
 
 def generate_gpt_interpretation(state: Dict) -> Dict:
     """특징을 바탕으로 GPT 해석 요청"""
@@ -40,12 +41,15 @@ def generate_gpt_interpretation(state: Dict) -> Dict:
         print("\nGPT를 통한 종합적 상황 분석 중...")
         
         features = state['extracted_features']
+        st_gcn = state['st_gcn_result']
+        objects = state['yolo_objects']
         features_str = "\n".join([f"{k}: {v}" for k, v in features.items()])
         
         prompt = ChatPromptTemplate.from_messages([
             ("system", """당신은 인간의 동작과 상황을 종합적으로 분석하는 전문가입니다. 
             스켈레톤 데이터, 객체 인식 결과, ST-GCN 분석 결과를 종합하여 현재 상황을 상세히 설명해주세요."""),
             ("user", """다음 정보를 바탕으로 현재 상황을 분석해주세요:
+            
             1. 스켈레톤 특징: {features}
             2. ST-GCN 행동 분석: {st_gcn}
             3. 주변 객체: {objects}""")

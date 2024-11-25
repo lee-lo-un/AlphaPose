@@ -4,6 +4,7 @@ from langgraph.graph.message import add_messages
 from langchain_teddynote.graphs import visualize_graph
 from LangChain.workflow_nodes import create_workflow, GraphState, show_graph_popup_cv2
 from Neo4j.neo4j_interface import Neo4jInterface
+import logging
 
 class State(TypedDict):
     messages: Annotated[list, add_messages]   
@@ -40,7 +41,10 @@ class ActionRecognitionSystem:
                 final_state['current_action']
             )
             
-            return final_state.get('current_action')
+            return {
+                'action': final_state.get('current_action'),
+                'gpt_interpretation': final_state.get('messages', [])[-1] if final_state.get('messages') else None
+            }
                 
         except Exception as e:
             print(f"\n워크플로우 실행 중 오류 발생: {e}")
@@ -51,3 +55,63 @@ class ActionRecognitionSystem:
         # Neo4j 쿼리를 통한 유사 행동 검색 구현
         # 향후 구현 예정
         return []
+
+    def generate_action_explanation(self, action_result, skeleton_data, object_data):
+        """행동에 대한 자세한 설명을 생성합니다."""
+        try:
+            action = action_result["action"]
+            confidence = action_result["confidence"]
+            
+            # 스켈레톤 데이터로부터 주요 자세 특징 추출
+            posture_features = self.extract_posture_features(skeleton_data)
+            
+            # 객체 상호작용 분석
+            object_interactions = self.analyze_object_interactions(object_data)
+            
+            explanation = {
+                "main_action": action,
+                "confidence_level": confidence,
+                "posture_description": posture_features,
+                "object_interactions": object_interactions,
+                "detailed_explanation": f"{action} 동작이 감지되었습니다. "
+                                     f"이 동작은 {posture_features.get('main_characteristics', '')}의 특징을 보이며, "
+                                     f"신뢰도는 {confidence*100:.1f}%입니다."
+            }
+            
+            return explanation
+        except Exception as e:
+            logging.error(f"설명 생성 중 오류 발생: {str(e)}")
+            return None
+
+    def compare_predictions_with_result(self, top5_predictions, actual_result):
+        """실시간 예측과 최종 분석 결과를 비교 분석합니다."""
+        try:
+            actual_action = actual_result["action"]
+            
+            analysis = {
+                "match_found": False,
+                "prediction_accuracy": 0,
+                "ranking": None,
+                "comparison": []
+            }
+            
+            for idx, pred in enumerate(top5_predictions):
+                if pred["action"] == actual_action:
+                    analysis["match_found"] = True
+                    analysis["prediction_accuracy"] = pred["confidence"]
+                    analysis["ranking"] = idx + 1
+                    break
+                    
+            analysis["comparison"] = [
+                {
+                    "predicted": pred["action"],
+                    "confidence": pred["confidence"],
+                    "matches_actual": pred["action"] == actual_action
+                }
+                for pred in top5_predictions
+            ]
+            
+            return analysis
+        except Exception as e:
+            logging.error(f"예측 비교 분석 중 오류 발생: {str(e)}")
+            return None

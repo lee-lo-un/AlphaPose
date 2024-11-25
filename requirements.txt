@@ -5,11 +5,11 @@ cython
 matplotlib
 numpy
 pandas
+python-dotenv
+ultralytics
 opencv
 pyyaml
 ninja
-python-dotenv
-ultralytics
 neo4j
 neo4j-driver
 langchain
