@@ -61,7 +61,7 @@ def extract_features(state: Dict) -> Dict:
         # 전체 자세 분석 추가
         posture_info = analyze_posture(skeleton)
 
-
+        joint_states = analyze_state(skeleton)
 
         features = {
             "손목_간_거리": f"{wrist_distance:.2f}",
@@ -81,7 +81,8 @@ def extract_features(state: Dict) -> Dict:
             "머리_정보": head_info,
             "자세_정보": posture_info,
             "yolo_objects": state.get('yolo_objects', []),  # YOLO 탐지 객체
-            "st_gcn_result": state.get('st_gcn_result', '')  # ST-GCN 결과
+            "st_gcn_result": state.get('st_gcn_result', ''),  # ST-GCN 결과
+            "다리상태": joint_states
         }
 
         state['extracted_features'] = features
@@ -147,7 +148,7 @@ def _classify_head_direction(angle: float) -> str:
         return "왼쪽"
 
 
-def analyze_joint(skeleton: Dict) -> Dict:
+def analyze_state(skeleton: Dict) -> Dict:
     """각 관절의 상태 분석"""
     joint_states = {}
     
@@ -157,13 +158,31 @@ def analyze_joint(skeleton: Dict) -> Dict:
             skeleton['left_hand'], 
             skeleton['right_hand']
         )
-        joint_states['hands_state'] = "맞잡음" if hand_distance < 30 else "벌어짐"
+        joint_states['hands_state'] = "맞잡음에 가까움" if hand_distance < 30 else ""
     
     # 다리 상태 분석
     if 'left_foot' in skeleton and 'right_foot' in skeleton:
-        left_foot_pos = skeleton['left_foot'].get('y', 0)
-        right_foot_pos = skeleton['right_foot'].get('y', 0)
-        joint_states['feet_state'] = "왼발 앞" if left_foot_pos > right_foot_pos else "오른발 앞"
+        left_foot_x_pos = skeleton['left_foot'].get(0, 'x')
+        right_foot_x_pos = skeleton['right_foot'].get(0, 'x')
+        left_foot_y_pos = skeleton['left_foot'].get('y', 0)
+        right_foot_y_pos = skeleton['right_foot'].get('y', 0)
+        if _classify_head_direction(skeleton['head_direction']) == "오른쪽":
+            if (left_foot_y_pos < right_foot_y_pos) & (left_foot_x_pos > right_foot_x_pos) :
+                joint_states['feet_state'] = "왼발 앞"
+            else : "오른발 앞"
+        elif _classify_head_direction(skeleton['head_direction']) == "왼쪽":     
+            if (left_foot_y_pos > right_foot_y_pos) & (left_foot_x_pos < right_foot_x_pos) :
+                joint_states['feet_state'] = "오른발 앞"
+            else : "왼발 앞"
+        elif _classify_head_direction(skeleton['head_direction']) == "앞쪽":
+            if (left_foot_y_pos < right_foot_y_pos) & (left_foot_x_pos > right_foot_x_pos) :
+                joint_states['feet_state'] = "왼발 앞"
+            else : "오른발 앞"
+        elif _classify_head_direction(skeleton['head_direction']) == "뒤쪽":
+            if (left_foot_y_pos < right_foot_y_pos) & (left_foot_x_pos < right_foot_x_pos) :
+                joint_states['feet_state'] = "왼발 앞" 
+            else : "오른발 앞"
+
     
     return joint_states
 

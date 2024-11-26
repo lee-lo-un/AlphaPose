@@ -7,11 +7,17 @@ router = APIRouter()
 
 class ImageData(BaseModel):
     image: str
+    text: Optional[str] = None
     top5_predictions: Optional[List[Dict[str, Union[str, float]]]] = None
 
 @router.post("/")
 async def analyze_image_endpoint(data: ImageData):
     try:
-        return analyze_image(data.image, data.top5_predictions)
+        print("Received request data:", {
+            "text": data.text,
+            "top5_predictions": data.top5_predictions
+        })
+        return analyze_image(data.image, data.text, data.top5_predictions)
     except Exception as e:
+        print(f"Error in analyze_image_endpoint: {e}")
         raise HTTPException(status_code=500, detail=str(e))

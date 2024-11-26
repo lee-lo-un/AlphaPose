@@ -13,34 +13,36 @@ class ActionRecognitionSystem:
     def __init__(self):
         self.workflow = create_workflow()
         self.neo4j = Neo4jInterface()
-        show_graph_popup_cv2(self.workflow)
+        #show_graph_popup_cv2(self.workflow)
         print("행동 인식 시스템이 초기화되었습니다.")
         
     def process_skeleton_data(self, skeleton_data: Dict[str, Any], 
                             yolo_objects: List = None, 
-                            st_gcn_result: str = None):
+                            text: str = None,
+                            top5_predictions: List = None):
         """스켈레톤 데이터 처리 및 행동 인식"""
         try:
             initial_state = {
-                "messages": [],
+                "messages": [text] if text else [],
                 "skeleton_data": skeleton_data,
                 "yolo_objects": yolo_objects or [],
-                "st_gcn_result": st_gcn_result or "",
+                "st_gcn_result": "",
                 "extracted_features": {},
                 "context": {},
                 "knowledge_graph": {},
-                "current_action": ""
+                "current_action": "",
+                "top5_predictions": top5_predictions
             }
             
             # 워크플로우 실행
             final_state = self.workflow.invoke(initial_state)
-            
+            print("=========final_state3333========>", final_state.get('top5_predictions'))
             # Neo4j 업데이트
-            self.neo4j.update_action_knowledge(
-                final_state['extracted_features'],
-                final_state['current_action']
-            )
-            
+            #self.neo4j.update_action_knowledge(
+            #    final_state['extracted_features'],
+            #    final_state['current_action']
+            #)
+            print("=========final_state4444========>", final_state.get('top5_predictions'))
             return {
                 'action': final_state.get('current_action'),
                 'gpt_interpretation': final_state.get('messages', [])[-1] if final_state.get('messages') else None
@@ -60,7 +62,7 @@ class ActionRecognitionSystem:
         """행동에 대한 자세한 설명을 생성합니다."""
         try:
             action = action_result["action"]
-            confidence = action_result["confidence"]
+            confidence = action_result["top5_predictions"]["confidence"]
             
             # 스켈레톤 데이터로부터 주요 자세 특징 추출
             posture_features = self.extract_posture_features(skeleton_data)

@@ -182,3 +182,11 @@ class STGCNProcessor:
             import traceback
             traceback.print_exc()
             return None
+
+    def send_predictions_to_frontend(self, predictions):
+        print("Sending predictions to frontend:", {
+            "type": "action",
+            "data": {
+                "top5": predictions
+            }
+        })

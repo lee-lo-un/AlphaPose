@@ -10,8 +10,9 @@ import logging
 
 action_recognition_system = ActionRecognitionSystem()
 
-def analyze_image(image_data: str, top5_predictions: Optional[List[Dict[str, Union[str, float]]]] = None) -> Dict:
+def analyze_image(image_data: str, text: Optional[str], top5_predictions: Optional[List[Dict[str, Union[str, float]]]] = None) -> Dict:
     try:
+        print("Received top5_predictions:", top5_predictions)
         # Base64 이미지 디코딩
         image_data = image_data.split(",")[1]
         image = Image.open(BytesIO(base64.b64decode(image_data)))
@@ -32,8 +33,12 @@ def analyze_image(image_data: str, top5_predictions: Optional[List[Dict[str, Uni
         
         if skeleton_data:
             action_result = action_recognition_system.process_skeleton_data(
-                skeleton_data["keypoints"], object_data
+                skeleton_data["keypoints"], 
+                object_data, 
+                text,
+                top5_predictions
             )
+            print("=========top5_predictions========>", top5_predictions)
             if action_result:
                 similar_actions = action_recognition_system.get_similar_actions(action_result)
                 # 행동에 대한 설명 생성
@@ -42,7 +47,7 @@ def analyze_image(image_data: str, top5_predictions: Optional[List[Dict[str, Uni
                     skeleton_data, 
                     object_data
                 )
-
+        print("=========top5_predictions11111========>", top5_predictions)
         # 분석 결과 구성
         result = {
             "skeleton_data": skeleton_data,
@@ -59,6 +64,7 @@ def analyze_image(image_data: str, top5_predictions: Optional[List[Dict[str, Uni
                 top5_predictions, 
                 action_result
             ) if action_result else None
+        print("=========result========>", result)
             
         return result
         
