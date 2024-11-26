@@ -1,4 +1,4 @@
-from typing import TypedDict, Annotated, Sequence, Dict, Any, Tuple
+from typing import TypedDict, Annotated, Sequence, Dict, Any, Tuple, Optional, List, Union
 from langchain_core.messages import BaseMessage
 from langgraph.graph import StateGraph
 from langchain_core.messages import HumanMessage, AIMessage
@@ -32,7 +32,9 @@ class GraphState(TypedDict):
     context: Dict
     knowledge_graph: Dict
     current_action: str
-
+    yolo_objects: list[Dict]
+    st_gcn_result: list[str]
+    top5_predictions: Optional[List[Dict[str, Union[str, float]]]]
 
 def generate_gpt_interpretation(state: Dict) -> Dict:
     """특징을 바탕으로 GPT 해석 요청"""
@@ -40,29 +42,44 @@ def generate_gpt_interpretation(state: Dict) -> Dict:
         print("\nGPT를 통한 종합적 상황 분석 중...")
         
         features = state['extracted_features']
-        features_str = "\n".join([f"{k}: {v}" for k, v in features.items()])
+        st_gcn = state['st_gcn_result']
+        objects = state['yolo_objects']
+        messages = state.get('messages', [])
+        user_input = messages[0] if messages else ""
+        top5_predictions = state.get('top5_predictions', [])
+        
+        # top5_predictions 정보를 문자열로 변환
+        predictions_str = "\n".join([
+            f"{pred['action']}: {pred['confidence']*100:.1f}%" 
+            for pred in top5_predictions
+        ]) if top5_predictions else "예측 정보 없음"
         
         prompt = ChatPromptTemplate.from_messages([
             ("system", """당신은 인간의 동작과 상황을 종합적으로 분석하는 전문가입니다. 
             스켈레톤 데이터, 객체 인식 결과, ST-GCN 분석 결과를 종합하여 현재 상황을 상세히 설명해주세요."""),
             ("user", """다음 정보를 바탕으로 현재 상황을 분석해주세요:
+            사용자 입력: {massage}
+             
             1. 스켈레톤 특징: {features}
             2. ST-GCN 행동 분석: {st_gcn}
-            3. 주변 객체: {objects}""")
+            3. 주변 객체: {objects}
+            4. ST-GCN 분석 결과 예측치: {predictions}""")
         ])
         
         chain = prompt | llm
         response = chain.invoke({
-            "features": features_str,
+            "features": features,
             "st_gcn": features.get('st_gcn_result', '없음'),
-            "objects": features.get('yolo_objects', '없음')
+            "objects": features.get('yolo_objects', '없음'),
+            "massage": user_input,
+            "predictions": predictions_str
         })
         
         state['current_action'] = response.content
         print(f"GPT 해석 결과: {response.content}")
         return state
     except Exception as e:
-        print(f"GPT 해석 중 오류 발: {e}")
+        print(f"GPT 해석 중 오류 발생: {e}")
         raise e
 
 def update_knowledge_graph(state: Dict) -> Dict:
