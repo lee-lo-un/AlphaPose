@@ -10,12 +10,12 @@ export default function HomePage() {
     <div className="w-full h-screen bg-white flex">
       {/* 왼쪽 영역 (로고) */}
       <div className="w-[8.33%] pl-20 pt-10">
-        <div className="w-[200px]">
+        <div className="w-[400px]">
           <Image
             src="/images/logo_new.png"
             alt="Alpha Pose Logo"
-            width={200}
-            height={100}
+            width={400}
+            height={200}
             className="object-contain w-full h-full"
             priority
           />
@@ -52,7 +52,7 @@ export default function HomePage() {
             />
             {/* 초록색 버튼 */}
             <div 
-              onClick={() => router.push('/upload')}
+              onClick={() => router.push('/gallery')}
               className="w-[200px] h-[200px] bg-[#009966] rounded-[32px] cursor-pointer transform transition-all hover:scale-105 shadow-lg hover:shadow-xl"
             />
           </div>
