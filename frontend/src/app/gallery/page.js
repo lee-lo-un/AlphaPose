@@ -44,8 +44,8 @@ export default function GalleryPage() {
               fill
               className="object-cover transition-all duration-300"
             />
-            <div className="absolute inset-0 bg-black bg-opacity-20 flex items-center justify-center">
-              <span className="text-white text-4xl font-bold">앉다</span>
+            <div className={`absolute inset-0 bg-black transition-opacity duration-300 ${hoverStates.sitting ? 'opacity-0' : 'bg-opacity-20'} flex items-center justify-center`}>
+              <span className={`text-white text-4xl font-bold transition-opacity duration-300 ${hoverStates.sitting ? 'opacity-0' : 'opacity-100'}`}>앉다</span>
             </div>
           </div>
 
@@ -61,8 +61,8 @@ export default function GalleryPage() {
               fill
               className="object-cover transition-all duration-300"
             />
-            <div className="absolute inset-0 bg-black bg-opacity-20 flex items-center justify-center">
-              <span className="text-white text-4xl font-bold">안다</span>
+            <div className={`absolute inset-0 bg-black transition-opacity duration-300 ${hoverStates.hugging ? 'opacity-0' : 'bg-opacity-20'} flex items-center justify-center`}>
+              <span className={`text-white text-4xl font-bold transition-opacity duration-300 ${hoverStates.hugging ? 'opacity-0' : 'opacity-100'}`}>안다</span>
             </div>
           </div>
 
@@ -78,11 +78,10 @@ export default function GalleryPage() {
               fill
               className="object-cover transition-all duration-300"
             />
-            <div className="absolute inset-0 bg-black bg-opacity-20 flex items-center justify-center">
-              <span className="text-white text-4xl font-bold">타다</span>
+            <div className={`absolute inset-0 bg-black transition-opacity duration-300 ${hoverStates.riding ? 'opacity-0' : 'bg-opacity-20'} flex items-center justify-center`}>
+              <span className={`text-white text-4xl font-bold transition-opacity duration-300 ${hoverStates.riding ? 'opacity-0' : 'opacity-100'}`}>타다</span>
             </div>
           </div>
-
 
         </div>
 
@@ -100,8 +99,8 @@ export default function GalleryPage() {
               fill
               className="object-cover transition-all duration-300"
             />
-            <div className="absolute inset-0 bg-black bg-opacity-20 flex items-center justify-center">
-              <span className="text-white text-4xl font-bold">보다</span>
+            <div className={`absolute inset-0 bg-black transition-opacity duration-300 ${hoverStates.looking ? 'opacity-0' : 'bg-opacity-20'} flex items-center justify-center`}>
+              <span className={`text-white text-4xl font-bold transition-opacity duration-300 ${hoverStates.looking ? 'opacity-0' : 'opacity-100'}`}>보다</span>
             </div>
           </div>
 
@@ -117,8 +116,8 @@ export default function GalleryPage() {
               fill
               className="object-cover transition-all duration-300"
             />
-            <div className="absolute inset-0 bg-black bg-opacity-20 flex items-center justify-center">
-              <span className="text-white text-4xl font-bold">책을 읽다</span>
+            <div className={`absolute inset-0 bg-black transition-opacity duration-300 ${hoverStates.reading ? 'opacity-0' : 'bg-opacity-20'} flex items-center justify-center`}>
+              <span className={`text-white text-4xl font-bold transition-opacity duration-300 ${hoverStates.reading ? 'opacity-0' : 'opacity-100'}`}>책을 읽다</span>
             </div>
           </div>
 
@@ -134,8 +133,8 @@ export default function GalleryPage() {
               fill
               className="object-cover transition-all duration-300"
             />
-            <div className="absolute inset-0 bg-black bg-opacity-20 flex items-center justify-center">
-              <span className="text-white text-4xl font-bold">달리다</span>
+            <div className={`absolute inset-0 bg-black transition-opacity duration-300 ${hoverStates.running ? 'opacity-0' : 'bg-opacity-20'} flex items-center justify-center`}>
+              <span className={`text-white text-4xl font-bold transition-opacity duration-300 ${hoverStates.running ? 'opacity-0' : 'opacity-100'}`}>달리다</span>
             </div>
           </div>
         </div>
