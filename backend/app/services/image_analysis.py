@@ -38,7 +38,7 @@ def analyze_image(image_data: str, text: Optional[str], top5_predictions: Option
                 text,
                 top5_predictions
             )
-            print("=========top5_predictions========>", top5_predictions)
+   
             if action_result:
                 similar_actions = action_recognition_system.get_similar_actions(action_result)
                 # 행동에 대한 설명 생성
@@ -47,7 +47,7 @@ def analyze_image(image_data: str, text: Optional[str], top5_predictions: Option
                     skeleton_data, 
                     object_data
                 )
-        print("=========top5_predictions11111========>", top5_predictions)
+        print("top5_predictions", top5_predictions)
         # 분석 결과 구성
         result = {
             "skeleton_data": skeleton_data,
@@ -64,7 +64,7 @@ def analyze_image(image_data: str, text: Optional[str], top5_predictions: Option
                 top5_predictions, 
                 action_result
             ) if action_result else None
-        print("=========result========>", result)
+        print("=====result======", result)
             
         return result
         

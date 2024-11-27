@@ -7,3 +7,9 @@
 - WebSocket
 
 ## 설치 방법
+
+npm install
+
+## 실행 방법
+
+npm run dev

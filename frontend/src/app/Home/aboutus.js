@@ -8,7 +8,9 @@ export default function PhotoPage() {
 
   return (
     <div className="w-full h-screen bg-white flex">
+
       {/* 왼쪽 영역: 이미지 */}
+      
       <div className="w-1/2 flex items-center justify-center">
         <div className="relative w-[795px] h-[755px]">
           <Image
@@ -35,7 +37,7 @@ export default function PhotoPage() {
 
             {/* 실행 버튼 */}
             <button
-              onClick={() => {/* 실행 기능 추가 */}}
+              onClick={() => router.push('/photo')}
               className="px-[60px] py-3 bg-red-500 text-white rounded-[20px] text-xl font-semibold hover:bg-red-600 transition-colors shadow-[0_4px_6px_rgba(0,0,0,0.3)] p-2 border-4 border-white hover:shadow-[0_25px_55px_rgba(0,0,0,0.6)]"
             >
               실행

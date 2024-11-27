@@ -36,13 +36,13 @@ class ActionRecognitionSystem:
             
             # 워크플로우 실행
             final_state = self.workflow.invoke(initial_state)
-            print("=========final_state3333========>", final_state.get('top5_predictions'))
+        
             # Neo4j 업데이트
             #self.neo4j.update_action_knowledge(
             #    final_state['extracted_features'],
             #    final_state['current_action']
             #)
-            print("=========final_state4444========>", final_state.get('top5_predictions'))
+        
             return {
                 'action': final_state.get('current_action'),
                 'gpt_interpretation': final_state.get('messages', [])[-1] if final_state.get('messages') else None

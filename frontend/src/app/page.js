@@ -4,10 +4,12 @@ import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { CameraIcon, FileIcon, VideoIcon } from '@/components/icons/DiamondIcons';
 import GalleryPage from './Home/gallery';
-import PhotoPage from './Home/photo';
+import AboutUsPage from './Home/aboutus';
+import { useState } from 'react';
 
 export default function HomePage() {
   const router = useRouter();
+  const [hoverText, setHoverText] = useState('');
 
   return (
     <div className="h-screen overflow-y-auto snap-y snap-mandatory">
@@ -28,7 +30,7 @@ export default function HomePage() {
         </div>
 
         {/* 중앙 텍스트 영역 - 1/6 지점에 위치 */}
-        <div className="w-[25%] ml-[8.33%] flex flex-col justify-center">
+        {/* <div className="w-[25%] ml-[8.33%] flex flex-col justify-center">
           <div className="flex flex-col items-center">
             <h1 className="text-[100px] leading-tight font-bold text-black text-left">
               Alpha<br />
@@ -44,25 +46,28 @@ export default function HomePage() {
               </p>
             </div>
           </div>
-        </div>
+        </div> */}
 
         {/* 오른쪽 영역 (버튼들) */}
         <div className="flex-1 flex items-center justify-center">
           <div className="flex flex-col gap-4 rotate-135">
             <div className="flex gap-6">
               {/* 파란색 버튼 */}
-              <div 
+              <div
                 onClick={() => router.push('/photo')}
+                onMouseEnter={() => setHoverText('영상의 이미지 분석합니다')}
+                onMouseLeave={() => setHoverText('')}
                 className="relative w-[200px] h-[200px] bg-[#0066CC] rounded-[32px] cursor-pointer transform transition-all hover:scale-105 shadow-lg hover:shadow-xl flex items-center justify-center"
               >
                 <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 -rotate-135">
                   <CameraIcon />
                 </div>
               </div>
-              
               {/* 초록색 버튼 */}
-              <div 
-                onClick={() => router.push('/gallery')}
+              <div
+                onClick={() => router.push('/upload')}
+                onMouseEnter={() => setHoverText('업로드 이미지 분석합니다')}
+                onMouseLeave={() => setHoverText('')}
                 className="relative w-[200px] h-[200px] bg-[#009966] rounded-[32px] cursor-pointer transform transition-all hover:scale-105 shadow-lg hover:shadow-xl flex items-center justify-center"
               >
                 <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 -rotate-135">
@@ -72,8 +77,10 @@ export default function HomePage() {
             </div>
             <div className="flex gap-6">
               {/* 빨간색 버튼 */}
-              <div 
+              <div
                 onClick={() => router.push('/live')}
+                onMouseEnter={() => setHoverText('실시간 영상 분석합니다')}
+                onMouseLeave={() => setHoverText('')}
                 className="relative w-[200px] h-[200px] bg-[#CC0000] rounded-[32px] cursor-pointer transform transition-all hover:scale-105 shadow-lg hover:shadow-xl flex items-center justify-center"
               >
                 <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 -rotate-135">
@@ -81,9 +88,32 @@ export default function HomePage() {
                 </div>
               </div>
               {/* 회색 버튼 */}
-              <div 
-                className="w-[450px] h-[450px] bg-gray-200 rounded-[32px] cursor-pointer transform transition-all hover:scale-105 shadow-lg hover:shadow-xl"
-              />
+              <div className="relative w-[450px] h-[450px] bg-gray-200 rounded-[32px] cursor-pointer transform transition-all hover:scale-105 shadow-lg hover:shadow-xl flex items-center justify-center">
+                {hoverText ? (
+                  <span
+                    className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 -rotate-135 text-[32px] font-bold text-center break-words leading-tight"
+                    style={{ 
+                      maxWidth: '100%',
+                      padding: '0 10px',
+                     }}
+                  >
+                    {hoverText}
+                  </span>
+                ) : (
+                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 -rotate-135">
+                    <h1 className="text-[80px] font-black leading-tight text-black text-center">
+                      Alpha<br />
+                      Pose
+                  </h1>
+                  {/* <Image
+                    src="/images/riding.png"
+                    width={450}
+                    height={450}
+                    className="cover"
+                  /> */}
+                </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -91,8 +121,9 @@ export default function HomePage() {
 
       {/* 포토 섹션 */}
       <section className="w-full h-screen snap-start">
-        <PhotoPage />
+        <AboutUsPage />
       </section>
+
 
       {/* 갤러리 섹션 */}
       <section className="w-full h-screen snap-start">

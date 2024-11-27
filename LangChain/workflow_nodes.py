@@ -56,14 +56,24 @@ def generate_gpt_interpretation(state: Dict) -> Dict:
         
         prompt = ChatPromptTemplate.from_messages([
             ("system", """당신은 인간의 동작과 상황을 종합적으로 분석하는 전문가입니다. 
-            스켈레톤 데이터, 객체 인식 결과, ST-GCN 분석 결과를 종합하여 현재 상황을 상세히 설명해주세요."""),
+            스켈레톤 데이터, 객체 인식 결과, ST-GCN 분석 결과를 종합하여 현재 상황을 상세히 설명해주세요.
+            다만 ST-GCN 분석 결과는 예측치이므로 신뢰도는 낮습니다 참고로만 봐줘야하고 무슨행동일거라는 판단은 관절간 각도 데이터를 기반으로 종합판단해야합니다 
+            또한 관절간 각도 데이터는 오차가 있을 수 있으므로 오차범위는 ±4도로 간주해야하고 관절간 각도는 상체와 하체를 먼저 분리해서 판단해야하며 각 팔(어깨-팔꿈치-손목끝간 관절)과 발(무릎-발목-발끝간 관절)로 이어지는 부분으로 나누어 
+            현재 인체의 상태를 판단해야합니다 
+            그리고 객체인식 되었다면 3. 4. 과정을 진행하는데 인식결과를 종합하고 사람간의 위치관계도 고려해주면 좋습니다 4. 과정이 된다면 근접하게 바라보는 수치도 있으니 어느정도로 보고있을거라는 고려도 할수있습니다 (백팩이나 가방같은 맬수있는것은 몸에 있다면 들고있을수도있지만 메고있는 상태일수도 있습니다)
+            6. 1~5 종합적으로 모든것을 고려해서 분석해주세요  
+            7. 최종적으로 2줄로 정도로 요약 판단글을 써주세요 (객체들, 사람들간의 위치나 관계 등등 종합적으로 무엇을 하고있고 어떤상황인지 판단)    
+             """),
             ("user", """다음 정보를 바탕으로 현재 상황을 분석해주세요:
             사용자 입력: {massage}
              
-            1. 스켈레톤 특징: {features}
-            2. ST-GCN 행동 분석: {st_gcn}
-            3. 주변 객체: {objects}
-            4. ST-GCN 분석 결과 예측치: {predictions}""")
+            1. 스켈레톤 상태분석(관절간 각도 데이터를 바탕으로): {features}
+            2. 스켈레톤 행동, 데이터 분석: {features}
+            3. 주변 객체: {objects}, {object_distance}
+            4. 시선 객체 교차 확인: {gaze_object}
+            5. ST-GCN 분석 결과 예측: {predictions}
+            6. 종합판단: 
+            7. 최종 요약: """)
         ])
         
         chain = prompt | llm
@@ -71,8 +81,10 @@ def generate_gpt_interpretation(state: Dict) -> Dict:
             "features": features,
             "st_gcn": features.get('st_gcn_result', '없음'),
             "objects": features.get('yolo_objects', '없음'),
+            "object_distance": features.get('객체_거리_판단', '없음'),
             "massage": user_input,
-            "predictions": predictions_str
+            "predictions": predictions_str,
+            "gaze_object": features.get('시선_객체_교차', '없음')
         })
         
         state['current_action'] = response.content

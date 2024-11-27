@@ -84,7 +84,7 @@ const WebcamComponent = () => {
   const connectWebSocket = () => {
     if (wsRef.current?.readyState === WebSocket.OPEN) return;
   
-    if (pathname === '/live') {
+    if (pathname === '/photo') {
       wsRef.current = new WebSocket('ws://localhost:8000/ws');
   
       wsRef.current.onopen = () => {
@@ -94,27 +94,34 @@ const WebcamComponent = () => {
       };
   
       wsRef.current.onmessage = (event) => {
-        const data = JSON.parse(event.data);
-        console.log('WebSocket raw data:', data);
-
-        if (data.type === "skeleton") {
-          setObjects(data.data.detection_results.objects || []);
-          setPoses(data.data.detection_results.poses || []);
-          captureFrame();
-        } else if (data.type === "action" && data.data.action_result) {
-          console.log('Action result received:', data.data.action_result);
-          
-          if (data.data.action_result.top5) {
-            const predictions = data.data.action_result.top5;
-            console.log('Received top5 predictions:', predictions);
-            
-            if (Array.isArray(predictions)) {
-              setTop5Predictions(predictions);
-              console.log('Top5 predictions state updated');
+        try {
+          // NaN 값을 null로 치환
+          const cleanedData = event.data.replace(/\bNaN\b/g, 'null');
+          const data = JSON.parse(cleanedData);
+          console.log('WebSocket raw data:', data);
+  
+          if (data.type === "skeleton") {
+            setObjects(data.data.detection_results.objects || []);
+            setPoses(data.data.detection_results.poses || []);
+            captureFrame();
+          } else if (data.type === "action" && data.data.action_result) {
+            console.log('Action result received:', data.data.action_result);
+  
+            if (data.data.action_result.top5) {
+              const predictions = data.data.action_result.top5;
+              console.log('Received top5 predictions:', predictions);
+  
+              if (Array.isArray(predictions)) {
+                setTop5Predictions(predictions);
+                console.log('Top5 predictions state updated');
+              }
             }
           }
+          processingRef.current = false;
+        } catch (error) {
+          console.error('Error parsing WebSocket data:', error);
+          processingRef.current = false;
         }
-        processingRef.current = false;
       };
   
       wsRef.current.onerror = () => {
@@ -131,6 +138,7 @@ const WebcamComponent = () => {
       };
     }
   };
+
 
   useEffect(() => {
     connectWebSocket();
@@ -240,12 +248,11 @@ const WebcamComponent = () => {
 
   return (
     <div className="container mx-auto p-4">
-      <div className="flex gap-8">
-        {/* 왼쪽: 웹캠 영역 */}
-        <div className="flex-1">
-          <div className="bg-white rounded-lg shadow-lg p-6">
-            {/* 웹캠 컴포넌트 */}
-            <div className="relative w-full max-w-3xl mx-auto mb-4">
+      <div className="bg-white rounded-lg shadow-lg p-6">
+        <div className="flex gap-6">
+          {/* 왼쪽: 웹캠 영역 */}
+          <div className="flex-1">
+            <div className="relative w-full max-w-3xl mx-auto">
               <Webcam
                 ref={webcamRef}
                 screenshotFormat="image/jpeg"
@@ -307,100 +314,102 @@ const WebcamComponent = () => {
                 </div>
               </div>
             </div>
+          </div>
 
-            {/* 입력 및 분석 버튼 영역 */}
-            <div className="max-w-3xl mx-auto">
-              <div className="flex gap-4">
-                <input
-                  type="text"
-                  className="flex-1 p-2 border rounded-lg"
-                  placeholder="메시지를 입력하세요..."
-                  value={inputText}
-                  onChange={(e) => setInputText(e.target.value)}
-                />
-                <button
-                  className={`px-4 py-2 rounded-lg font-bold ${
-                    isAnalyzing
-                      ? 'bg-gray-500 text-white'
-                      : 'bg-blue-500 hover:bg-blue-700 text-white'
-                  }`}
-                  onClick={analyzeImage}
-                  disabled={isAnalyzing}
-                >
-                  {isAnalyzing ? '분석 중...' : '분석'}
-                </button>
-              </div>
-            </div>
+          {/* 오른쪽: Top5 예측 표시 */}
+          <div className="w-64">
+            <Top5PredictionsDisplay predictions={top5Predictions} />
           </div>
         </div>
 
-        {/* 오른쪽: Top5 예측 표시 */}
-        <div className="w-64">
-          <Top5PredictionsDisplay predictions={top5Predictions} />
+        {/* 입력 및 분석 버튼 영역 */}
+        <div className="max-w-3xl mx-auto mt-4">
+          <div className="flex gap-4">
+            <input
+              type="text"
+              className="flex-1 p-2 border rounded-lg"
+              placeholder="메시지를 입력하세요..."
+              value={inputText}
+              onChange={(e) => setInputText(e.target.value)}
+            />
+            <button
+              className={`px-4 py-2 rounded-lg font-bold ${
+                isAnalyzing
+                  ? 'bg-gray-500 text-white'
+                  : 'bg-blue-500 hover:bg-blue-700 text-white'
+              }`}
+              onClick={analyzeImage}
+              disabled={isAnalyzing}
+            >
+              {isAnalyzing ? '분석 중...' : '분석'}
+            </button>
+          </div>
         </div>
       </div>
 
       {/* 분석 결과 섹션 */}
       {analysisResult && (
-        <div className="bg-white rounded-lg shadow-lg p-6">
-          <div className="space-y-6 max-w-3xl mx-auto">
-            {/* 분석된 이미지 */}
-            <div className="relative w-full">
-              <img 
-                src={analysisImage} 
-                alt="Analyzed frame" 
-                className="w-full h-auto rounded-lg"
-              />
-              
-              {/* 스켈톤 오버레이 */}
-              {analysisResult.skeleton_data && (
-                <div className="absolute top-0 left-0 w-full h-full">
-                  {Object.entries(analysisResult.skeleton_data.keypoints).map(([key, kp], idx) => (
-                    <div
-                      key={`analysis-kp-${idx}`}
-                      className="absolute w-2 h-2 bg-red-500 rounded-full"
-                      style={{
-                        left: `${kp.x}px`,
-                        top: `${kp.y}px`,
-                        opacity: kp.score > 0.5 ? 1 : 0.3,
-                      }}
-                    />
-                  ))}
+        <div className="mt-6">
+          <div className="bg-white rounded-lg shadow-lg p-6">
+            <div className="space-y-6 max-w-3xl mx-auto">
+              {/* 분석된 이미지 */}
+              <div className="relative w-full">
+                <img 
+                  src={analysisImage} 
+                  alt="Analyzed frame" 
+                  className="w-full h-auto rounded-lg"
+                />
+                
+                {/* 스켈톤 오버레이 */}
+                {analysisResult.skeleton_data && (
+                  <div className="absolute top-0 left-0 w-full h-full">
+                    {Object.entries(analysisResult.skeleton_data.keypoints).map(([key, kp], idx) => (
+                      <div
+                        key={`analysis-kp-${idx}`}
+                        className="absolute w-2 h-2 bg-red-500 rounded-full"
+                        style={{
+                          left: `${kp.x}px`,
+                          top: `${kp.y}px`,
+                          opacity: kp.score > 0.5 ? 1 : 0.3,
+                        }}
+                      />
+                    ))}
+                  </div>
+                )}
+
+                {/* 객체 감지 박스 오버레이 */}
+                {analysisResult.object_data && analysisResult.object_data.length > 0 && (
+                  <>
+                    {analysisResult.object_data.map((obj, idx) => (
+                      <div
+                        key={`analysis-obj-${idx}`}
+                        className="absolute border-2 border-green-500"
+                        style={{
+                          left: `${obj.bbox[0]}px`,
+                          top: `${obj.bbox[1]}px`,
+                          width: `${obj.bbox[2] - obj.bbox[0]}px`,
+                          height: `${obj.bbox[3] - obj.bbox[1]}px`,
+                        }}
+                      >
+                        <span className="absolute -top-6 left-0 bg-green-500 text-white px-2 py-1 text-xs rounded">
+                          {obj.class} ({obj.confidence?.toFixed(2)})
+                        </span>
+                      </div>
+                    ))}
+                  </>
+                )}
+              </div>
+
+              {/* GPT 해석 결과 표시 영역 */}
+              {analysisResult?.action_result?.action && (
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <h3 className="text-lg font-bold mb-4 text-gray-800">분석 결과</h3>
+                  <p className="text-sm whitespace-pre-wrap text-gray-700">
+                    {analysisResult.action_result.action}
+                  </p>
                 </div>
               )}
-
-              {/* 객체 감지 박스 오버레이 */}
-              {analysisResult.object_data && analysisResult.object_data.length > 0 && (
-                <>
-                  {analysisResult.object_data.map((obj, idx) => (
-                    <div
-                      key={`analysis-obj-${idx}`}
-                      className="absolute border-2 border-green-500"
-                      style={{
-                        left: `${obj.bbox[0]}px`,
-                        top: `${obj.bbox[1]}px`,
-                        width: `${obj.bbox[2] - obj.bbox[0]}px`,
-                        height: `${obj.bbox[3] - obj.bbox[1]}px`,
-                      }}
-                    >
-                      <span className="absolute -top-6 left-0 bg-green-500 text-white px-2 py-1 text-xs rounded">
-                        {obj.class} ({obj.confidence?.toFixed(2)})
-                      </span>
-                    </div>
-                  ))}
-                </>
-              )}
             </div>
-
-            {/* GPT 해석 결과 표시 영역 */}
-            {analysisResult?.action_result?.action && (
-              <div className="bg-gray-50 rounded-lg p-4">
-                <h3 className="text-lg font-bold mb-4 text-gray-800">분석 결과</h3>
-                <p className="text-sm whitespace-pre-wrap text-gray-700">
-                  {analysisResult.action_result.action}
-                </p>
-              </div>
-            )}
           </div>
         </div>
       )}

@@ -1,4 +1,5 @@
 from typing import Dict
+from click import Tuple
 import numpy as np
 from LangChain.utility.geometry_util import calculate_angle, calculate_distance, calculate_direction
 
@@ -45,23 +46,13 @@ def extract_features(state: Dict) -> Dict:
         left_wrist_position = "어깨보다 위" if left_wrist.get('y', 0) < left_shoulder.get('y', 0) else "어깨보다 아래"
         right_wrist_position = "어깨보다 위" if right_wrist.get('y', 0) < right_shoulder.get('y', 0) else "어깨보다 아래"
 
+        # 손목 팔꿈치 위치 판단
+        left_wrist_elbow_position = "팔꿈치보다 위" if left_wrist.get('y', 0) < left_elbow.get('y', 0) else "팔꿈치보다 아래"
+        right_wrist_elbow_position = "팔꿈치보다 위" if right_wrist.get('y', 0) < right_elbow.get('y', 0) else "팔꿈치보다 아래"
+
         # 발 위치 판단
         left_ankle_position = "발을 차는 중" if left_ankle.get('y', 0) < left_knee.get('y', 0) else ""
         right_ankle_position = "발을 차는 중" if right_ankle.get('y', 0) < right_knee.get('y', 0) else ""
-
-        # 방향 분석 추가
-        direction = calculate_direction(skeleton)
-        
-        # 관절 상태 분석
-        #joint_states = analyze_joint_states(skeleton)
-        
-        # 머리 방향 분�� 추가
-        head_info = analyze_head_direction(skeleton)
-        
-        # 전체 자세 분석 추가
-        posture_info = analyze_posture(skeleton)
-
-        joint_states = analyze_state(skeleton)
 
         features = {
             "손목_간_거리": f"{wrist_distance:.2f}",
@@ -73,17 +64,61 @@ def extract_features(state: Dict) -> Dict:
             "오른쪽_고관절_각도": f"{right_hip_angle:.2f}",
             "왼쪽_무릎_각도": f"{left_knee_angle:.2f}",
             "오른쪽_무릎_각도": f"{right_knee_angle:.2f}",
-            "왼손_위치": left_wrist_position,
-            "오른손_위치": right_wrist_position,
+            "왼쪽_손목_어깨_위치": left_wrist_position,
+            "오른쪽_손목_어깨_위치": right_wrist_position,
+            "왼쪽_손목_팔꿈치_위치": left_wrist_elbow_position,
+            "오른쪽_손목_팔꿈치_위치": right_wrist_elbow_position,
             "왼발_상태": left_ankle_position,
             "오른발_상태": right_ankle_position,
+        }
+
+        # 방향 분석 추가
+        direction = calculate_direction(skeleton)
+        
+        # 관절 상태 분석
+        #joint_states = analyze_joint_states(skeleton)
+        
+        # 머리 방향 분�� 추가
+        head_info = analyze_head_direction(skeleton)
+        
+        # 전체 자세 분석 추가
+        posture_info = analyze_posture(skeleton, features)
+
+        joint_states = analyze_state(skeleton)
+
+        object_skeleton_distance = []
+        contact_results = check_contact(state.get('yolo_objects', []), skeleton, threshold=50)
+        for result in contact_results:
+            print(f"객체 {result['object_class']}가 {result['joint_name']}과 접촉 (거리: {result['distance']:.2f}, 신뢰도: {result['confidence']:.2f})")
+            object_skeleton_distance.append(result)
+
+
+        # 시선 벡터 계산
+        nose = np.array([skeleton.get('nose', {}).get('x', 0), skeleton.get('nose', {}).get('y', 0)])
+        left_eye = np.array([skeleton.get('left_eye', {}).get('x', 0), skeleton.get('left_eye', {}).get('y', 0)])
+        right_eye = np.array([skeleton.get('right_eye', {}).get('x', 0), skeleton.get('right_eye', {}).get('y', 0)])
+        
+        intersected_object = "No gaze data available"
+        if np.all(nose) and np.all(left_eye) and np.all(right_eye):
+            gaze_data = calculate_gaze_vector(nose, left_eye, right_eye)
+            print("시선 벡터:     ",gaze_data)
+            # 시선과 객체 교차 확인
+            intersected_object = check_gaze_intersection(gaze_data, state.get('yolo_objects', []))
+            print("시선 객체 교차:     ",intersected_object)
+
+        yolo_objects = [obj.get('class', '') for obj in state.get('yolo_objects', [])]
+
+        features_update = {
             "방향": direction,
             "머리_정보": head_info,
             "자세_정보": posture_info,
-            "yolo_objects": state.get('yolo_objects', []),  # YOLO 탐지 객체
+            "다리상태": joint_states,
+            "yolo_objects": yolo_objects,  # YOLO 탐지 객체
+            "객체_거리_판단": object_skeleton_distance,
+            "시선_객체_교차": intersected_object,
             "st_gcn_result": state.get('st_gcn_result', ''),  # ST-GCN 결과
-            "다리상태": joint_states
         }
+        features.update(features_update)
 
         state['extracted_features'] = features
         print(f"추출된 특징: {features}")
@@ -93,7 +128,6 @@ def extract_features(state: Dict) -> Dict:
         print(f"특징 추출 중 오류 발생: {e}")
         print(f"현재 스켈레톤 데이터: {skeleton}")  # 디버깅을 위한 데이터 출력
         raise e
-
 
 
     
@@ -109,6 +143,14 @@ def analyze_head_direction(skeleton: Dict) -> Dict:
                            skeleton.get('left_eye', {}).get('y', 0)])
         right_eye = np.array([skeleton.get('right_eye', {}).get('x', 0), 
                             skeleton.get('right_eye', {}).get('y', 0)])
+        left_ear = np.array([skeleton.get('left_ear', {}).get('x', 0), 
+                           skeleton.get('left_ear', {}).get('y', 0)])
+        right_ear = np.array([skeleton.get('right_ear', {}).get('x', 0), 
+                            skeleton.get('right_ear', {}).get('y', 0)])
+    
+        if not nose or (not left_eye and not right_eye):
+            # 뒷모습으로 간주
+            return {"머리_방향": "뒤쪽", "상세정보": "얼굴 데이터 누락"}
         
         # 눈 중심점 계산
         eye_center = (left_eye + right_eye) / 2
@@ -124,6 +166,7 @@ def analyze_head_direction(skeleton: Dict) -> Dict:
         
         # 시선 방향 시각화
         #visualize_gaze_direction(skeleton)
+        
         
         return {
             "시선_방향": gaze_angle,
@@ -186,9 +229,7 @@ def analyze_state(skeleton: Dict) -> Dict:
     
     return joint_states
 
-
-
-def analyze_posture(skeleton: Dict) -> Dict:
+def analyze_posture(skeleton: Dict, features: Dict) -> Dict:
     """전체 자세 분석"""
     try:
         # 걸음걸이 분석
@@ -209,11 +250,150 @@ def analyze_posture(skeleton: Dict) -> Dict:
             walking_state = "걷는중"
         else:
             walking_state = "뛰는중"
-            
+
+        left_knee_angle = features.get('왼쪽_무릎_각도', 0)
+        right_knee_angle = features.get('오른쪽_무릎_각도', 0)
+        # 자세 판단
+        if left_knee_angle < 105 and right_knee_angle < 105:
+            posture = "앉아 있음"
+        elif foot_distance > 100:
+            posture = "다리사이거리가 있음"
+        else:
+            posture = "서 있음"
+
         return {
             "보행_상태": walking_state,
-            "발_간격": foot_distance
+            "발_간격": foot_distance,
+            "하체_자세": posture
         }
     except Exception as e:
         print(f"자세 분석 중 오류: {e}")
         return {}
+
+
+### 객체와 사람의 위치분석
+
+def calculate_object_centroids(yolo_objects):
+    """YOLO 탐지 객체의 중심점 계산"""
+    centroids = []
+    for obj in yolo_objects:
+        bbox = obj['bbox']  # [x_min, y_min, x_max, y_max]
+        centroid_x = (bbox[0] + bbox[2]) / 2
+        centroid_y = (bbox[1] + bbox[3]) / 2
+        centroids.append({
+            'class': obj['class'],
+            'confidence': obj['confidence'],
+            'centroid': {'x': centroid_x, 'y': centroid_y}
+        })
+    return centroids
+
+def calculate_distance_between_points(point1, point2):
+    """두 점 사이의 거리 계산"""
+    return ((point1['x'] - point2['x']) ** 2 + (point1['y'] - point2['y']) ** 2) ** 0.5
+
+def check_contact(yolo_objects, skeleton, threshold=50):
+    """
+    YOLO 객체와 스켈레톤 관절 간 접촉 여부를 판단
+    threshold: 접촉으로 간주할 거리 임계값
+    """
+    results = []
+    centroids = calculate_object_centroids(yolo_objects)
+    
+    # 관절 데이터 가져오기
+    joints = {
+        '왼손목': skeleton.get('left_wrist', {}),
+        '오른손목': skeleton.get('right_wrist', {}),
+        '왼발목': skeleton.get('left_ankle', {}),
+        '오른발목': skeleton.get('right_ankle', {}),
+        '코': skeleton.get('nose', {})
+    }
+    
+    # 각 객체 중심점과 관절 간 거리 계산
+    for obj in centroids:
+        for joint_name, joint_data in joints.items():
+            if joint_data:  # 관절 데이터가 존재하는 경우에만 계산
+                distance = calculate_distance_between_points(obj['centroid'], joint_data)
+                if distance <= threshold:
+                    results.append({
+                        'object_class': obj['class'],
+                        'joint_name': joint_name,
+                        'distance': distance,
+                        'confidence': obj['confidence'],
+                        'contact': True
+                    })
+    
+    return results
+
+
+### 시선으으로 객체를 보는지 판단
+
+def calculate_gaze_vector(nose, left_eye, right_eye) -> Dict:
+    """시선 벡터 계산"""
+    try:     
+        # 눈 중심점 계산
+        eye_center = (left_eye + right_eye) / 2
+        
+        # 시선 벡터 계산 (눈 중심 → 코 방향)
+        gaze_vector = nose - eye_center
+        
+        # 정규화된 벡터 반환
+        norm = np.linalg.norm(gaze_vector)
+        if norm == 0:
+            raise ValueError("시선 벡터의 크기가 0입니다.")
+        gaze_vector_normalized = gaze_vector / norm
+        
+        return {
+            "eye_center": eye_center,
+            "nose": nose,
+            "gaze_vector": gaze_vector_normalized
+        }
+    except Exception as e:
+        print(f"시선 벡터 계산 중 오류: {e}")
+        return None
+    
+# 객체와 시선의 교차 확인
+def check_gaze_intersection(gaze_data: Dict, yolo_objects: list, threshold: float = 50.0) -> str:
+    """시선 벡터와 객체의 교차 여부 확인"""
+    try:
+        eye_center = np.array(gaze_data["eye_center"])
+        gaze_vector = np.array(gaze_data["gaze_vector"])
+        
+        # 이미지 경계를 기준으로 시선 연장
+        #max_dim = max(image_dims)
+        max_dim = (640, 480)
+        gaze_endpoint = eye_center + gaze_vector * max_dim  # 최대 길이로 연장
+        
+        closest_object = None
+        closest_distance = float('inf')  # 초기값을 무한대로 설정
+        distances = []  # 모든 객체와의 거리 정보를 저장할 리스트
+
+        for obj in yolo_objects:
+            bbox = obj['bbox']
+            bbox_x1, bbox_y1, bbox_x2, bbox_y2 = bbox
+            
+            # 객체 중심 계산
+            obj_center = np.array([(bbox_x1 + bbox_x2) / 2, (bbox_y1 + bbox_y2) / 2])
+            
+            # 객체 중심과 시선 선분 간 거리 계산
+            distance = np.linalg.norm(
+                np.cross(gaze_endpoint - eye_center, eye_center - obj_center)
+            ) / np.linalg.norm(gaze_endpoint - eye_center)
+
+            distances.append({"object_class": obj['class'], "distance": distance})
+            
+            # 가장 가까운 객체 업데이트
+            if distance < threshold and distance < closest_distance:
+                closest_distance = distance
+                closest_object = obj
+
+        # 결과 생성
+        result = {
+            "closest_object": closest_object['class'] if closest_object else "No object in gaze direction",
+            "closest_distance": closest_distance if closest_object else None,
+            "all_distances": distances  # 모든 객체와의 거리 정보 포함
+        }
+
+        return result
+    except Exception as e:
+        print(f"시선 교차 확인 중 오류: {e}")
+        return None
