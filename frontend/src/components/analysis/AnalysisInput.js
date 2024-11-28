@@ -1,7 +1,6 @@
-// 텍스트 입력과 분석 버튼을 담당하는 컴포넌트
-const AnalysisInput = ({ inputText, setInputText, onAnalyze, isAnalyzing }) => {
+export default function AnalysisInput({ inputText, setInputText, isAnalyzing, onAnalyze }) {
   return (
-    <div className="w-full">
+    <div className="max-w-3xl mx-auto">
       <div className="flex gap-4">
         <input
           type="text"
@@ -10,8 +9,18 @@ const AnalysisInput = ({ inputText, setInputText, onAnalyze, isAnalyzing }) => {
           value={inputText}
           onChange={(e) => setInputText(e.target.value)}
         />
-        <AnalysisButton onClick={onAnalyze} isAnalyzing={isAnalyzing} />
+        <button
+          className={`px-4 py-2 rounded-lg font-bold ${
+            isAnalyzing
+              ? 'bg-gray-500 text-white'
+              : 'bg-blue-500 hover:bg-blue-700 text-white'
+          }`}
+          onClick={onAnalyze}
+          disabled={isAnalyzing}
+        >
+          {isAnalyzing ? '분석 중...' : '분석'}
+        </button>
       </div>
     </div>
   );
-}; 
+} 

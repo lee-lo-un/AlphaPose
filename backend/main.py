@@ -16,6 +16,7 @@ from io import BytesIO
 from PIL import Image
 import base64
 import traceback
+from typing import Optional, List, Dict, Union
 
 # 현재 파일의 위치를 기준으로 상대 경로 설정
 current_dir = Path(__file__).resolve().parent
@@ -63,6 +64,8 @@ async def shutdown_event():
 # 이미지 데이터를 처리하기 위한 모델
 class ImageData(BaseModel):
     image: str
+    text: Optional[str] = None
+    top5_predictions: Optional[List[Dict[str, Union[str, float]]]] = None
 
 @app.post("/analyze")
 async def analyze_image(data: ImageData):
@@ -84,14 +87,15 @@ async def analyze_image(data: ImageData):
         # 행동 인식
         action_result = None
         similar_actions = []
-        print("====skeleton_data: ", skeleton_data)
-        print("skeleton_data['keypoints']: ", skeleton_data["keypoints"])
-        if skeleton_data:
-            action_result = action_recognition_system.process_skeleton_data(skeleton_data["keypoints"],object_data), 
+        
+        if skeleton_data and "keypoints" in skeleton_data:
+            action_result = action_recognition_system.process_skeleton_data(
+                skeleton_data["keypoints"],
+                object_data
+            )
             if action_result:
                 similar_actions = action_recognition_system.get_similar_actions(action_result)
-        #response_data, yolo_time = await process_frame(1)
-        #print("===response_data: ",response_data)  
+
         return {
             "skeleton_data": skeleton_data,
             "object_data": object_data,
