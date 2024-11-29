@@ -17,8 +17,7 @@
 
 - Conda 환경 생성 (Python 10 버전)
 ```bash
-conda create -n alphapose python=3.10
-conda activate alphapose
+conda create -n alphapose python=3.10 -y
 ```
 
 ### setup.py 파일로 설치
