@@ -36,11 +36,11 @@ conda activate alphapose
 
  - cpu 사용자라면 
 ```bash
-   pip install .[pytorch-cpu, mmaction]
+   pip install .[pytorch-cpu,mmaction]
 ```
  - gpu 사용자라면
 ```bash
-   pip install .[pytorch-gpu, mmaction]
+   pip install .[pytorch-gpu,mmaction]
 ```
 
 ### (2) 프론트 설치
