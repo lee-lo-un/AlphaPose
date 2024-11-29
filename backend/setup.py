@@ -34,12 +34,16 @@ install_requires = [
     "tqdm",
     "pandas",
     "matplotlib",
+    "openmim",
     
     # 개발 도구
     "pytest",
     "black",
     "isort",
     "mypy",
+
+    "importlib-metadata",
+    "ipython",
 ]
 
 # PyTorch와 CUDA 관련 라이브러리
@@ -54,10 +58,20 @@ extras_require = {
         "torchvision==0.16.2",
         "torchaudio==2.1.2",
     ],
+    "mmcv": [
+        "mmcv==2.1.0",
+    ],
+    "mmengine": [
+        "mmengine==0.10.1",
+    ],
+    "mmdet": [
+        "mmdet>=3.0.0",
+    ],
+    "mmpose": [
+        "mmpose>=1.0.0",
+    ],
     "mmaction": [
         "mmaction2==1.2.0",
-        "mmcv==2.1.0",
-        "mmengine==0.10.1",
     ],
 }
 
