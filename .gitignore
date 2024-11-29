@@ -1,5 +1,3 @@
-__pycache__/
-
 # IDE settings
 .vscode/
 .idea/
@@ -15,3 +13,11 @@ ENV/
 *.log
 /logs/*
 
+# Python-specific ignores
+*.pyc
+__pycache__/
+*.pyo
+*.egg
+*.egg-info/
+dist/
+build/
