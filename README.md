@@ -18,10 +18,10 @@
 - Conda 환경 생성 (Python 10 버전)
 ```bash
 conda create -n alphapose python=3.10 -y
-conda activate alphapose
 ```
 
 ### setup.py 파일로 설치
+
 ### (1) 백엔드 설치
 - 1) 백엔드 폴더이동
    ```bash
@@ -36,11 +36,13 @@ conda activate alphapose
 
  - cpu 사용자라면 
 ```bash
-   pip install .[pytorch-cpu,mmaction]
+   pip install -e .[pytorch-cpu]
+   pip install -e .[mmcv,mmengine,mmdet,mmpose,mmaction]
 ```
  - gpu 사용자라면
 ```bash
-   pip install .[pytorch-gpu,mmaction]
+   pip install -e .[pytorch-gpu]
+   pip install -e .[mmcv,mmengine,mmdet,mmpose,mmaction]
 ```
 
 ### (2) 프론트 설치

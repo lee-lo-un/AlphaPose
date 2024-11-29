@@ -38,3 +38,5 @@ python-multipart
 pydantic
 pydantic-settings
  
+ipython
+importlib-metadata

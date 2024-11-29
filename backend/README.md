@@ -16,16 +16,19 @@ cd backend
 
 1. 의존성 설치:
 
- - cpu 사용자라면
-   ```bash
-   pip install .[pytorch-cpu]
-   pip install .[mmaction]
-   ```
+- 백엔드에서 cpu와 gpu 사용자에따라 둘중 하나 선택해서 설치
+- gpu설치자는 CUDA 11.8버전으로 환경 세팅 필요
+
+ - cpu 사용자라면 
+```bash
+   pip install -e .[pytorch-cpu]
+   pip install -e .[mmcv,mmengine,mmdet,mmpose,mmaction]
+```
  - gpu 사용자라면
-    ```bash
-   pip install .[pytorch-gpu]
-   pip install .[mmaction]
-   ```
+```bash
+   pip install -e .[pytorch-gpu]
+   pip install -e .[mmcv,mmengine,mmdet,mmpose,mmaction]
+```
 
 - 백엔드에서 위의 2개 명령어를 통해 설치 (cpu와 gpu 사용자에따라 둘중 하나 선택)
 - gpu설치자는 CUDA 11.8버전으로 환경 세팅 필요
