@@ -14,18 +14,20 @@ def analyze_image(image_data: str, text: Optional[str], top5_predictions: Option
     try:
         print("Received top5_predictions:", top5_predictions)
         # Base64 이미지 디코딩
-        image_data = image_data.split(",")[1]
-        image = Image.open(BytesIO(base64.b64decode(image_data)))
-        image_np = np.array(image)
-        models = None
-
-        if models is None:
-            models = get_models()
-            detect_model, pose_model, stgcn_processor, action_recognition_system = models
+        try:
+            if "," in image_data:
+                image_data = image_data.split(",")[1]  # Base64 헤더 제거
+            image = Image.open(BytesIO(base64.b64decode(image_data)))
+        except Exception as e:
+            logging.error(f"이미지 디코딩 실패: {e}")
+            raise ValueError("잘못된 이미지 형식입니다.")
+        
+        # 이미지 디코딩 후 확인
+        detect_model, pose_model, stgcn_processor, action_recognition_system = get_models()
 
         # 스켈레톤 및 객체 데이터 추출
-        skeleton_data, object_data = process_single_person_with_objects(image_np, detect_model, pose_model)
-        
+        skeleton_data, object_data = process_single_person_with_objects(image, detect_model, pose_model)
+       
         # 행동 인식
         action_result = None
         similar_actions = []
@@ -47,6 +49,7 @@ def analyze_image(image_data: str, text: Optional[str], top5_predictions: Option
                     skeleton_data, 
                     object_data
                 )
+                
         print("top5_predictions", top5_predictions)
         # 분석 결과 구성
         result = {
@@ -64,7 +67,7 @@ def analyze_image(image_data: str, text: Optional[str], top5_predictions: Option
                 top5_predictions, 
                 action_result
             ) if action_result else None
-        print("=====result======", result)
+        #print("=====result======", result)
             
         return result
         

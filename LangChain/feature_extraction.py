@@ -55,15 +55,15 @@ def extract_features(state: Dict) -> Dict:
         right_ankle_position = "발을 차는 중" if right_ankle.get('y', 0) < right_knee.get('y', 0) else ""
 
         features = {
-            "손목_간_거리": f"{wrist_distance:.2f}",
-            "왼쪽_팔꿈치_각도": f"{left_elbow_angle:.2f}",
-            "오른쪽_팔꿈치_각도": f"{right_elbow_angle:.2f}",
-            "왼쪽_어깨_각도": f"{left_shoulder_angle:.2f}",
-            "오른쪽_어깨_각도": f"{right_shoulder_angle:.2f}",
-            "왼쪽_고관절_각도": f"{left_hip_angle:.2f}",
-            "오른쪽_고관절_각도": f"{right_hip_angle:.2f}",
-            "왼쪽_무릎_각도": f"{left_knee_angle:.2f}",
-            "오른쪽_무릎_각도": f"{right_knee_angle:.2f}",
+            "손목_간_거리": wrist_distance,
+            "왼쪽_팔꿈치_각도": left_elbow_angle,
+            "오른쪽_팔꿈치_각도": right_elbow_angle,
+            "왼쪽_어깨_각도": left_shoulder_angle,
+            "오른쪽_어깨_각도": right_shoulder_angle,
+            "왼쪽_고관절_각도": left_hip_angle,
+            "오른쪽_고관절_각도": right_hip_angle,
+            "왼쪽_무릎_각도": left_knee_angle,
+            "오른쪽_무릎_각도": right_knee_angle,
             "왼쪽_손목_어깨_위치": left_wrist_position,
             "오른쪽_손목_어깨_위치": right_wrist_position,
             "왼쪽_손목_팔꿈치_위치": left_wrist_elbow_position,
@@ -92,6 +92,8 @@ def extract_features(state: Dict) -> Dict:
             print(f"객체 {result['object_class']}가 {result['joint_name']}과 접촉 (거리: {result['distance']:.2f}, 신뢰도: {result['confidence']:.2f})")
             object_skeleton_distance.append(result)
 
+        object_interactions = analyze_object_interactions(state.get('yolo_objects', []))
+
 
         # 시선 벡터 계산
         nose = np.array([skeleton.get('nose', {}).get('x', 0), skeleton.get('nose', {}).get('y', 0)])
@@ -116,6 +118,7 @@ def extract_features(state: Dict) -> Dict:
             "yolo_objects": yolo_objects,  # YOLO 탐지 객체
             "객체_거리_판단": object_skeleton_distance,
             "시선_객체_교차": intersected_object,
+            "중심_객체_거리": object_interactions,
             "st_gcn_result": state.get('st_gcn_result', ''),  # ST-GCN 결과
         }
         features.update(features_update)
@@ -148,7 +151,7 @@ def analyze_head_direction(skeleton: Dict) -> Dict:
         right_ear = np.array([skeleton.get('right_ear', {}).get('x', 0), 
                             skeleton.get('right_ear', {}).get('y', 0)])
     
-        if not nose or (not left_eye and not right_eye):
+        if nose.size == 0 or (left_eye.size == 0 and right_eye.size == 0):
             # 뒷모습으로 간주
             return {"머리_방향": "뒤쪽", "상세정보": "얼굴 데이터 누락"}
         
@@ -245,21 +248,21 @@ def analyze_posture(skeleton: Dict, features: Dict) -> Dict:
         
         # 보행 상태 판단
         if foot_distance < 30:
-            walking_state = "서있음"
+            walking_state = "다리사이 간격 좁음"
         elif foot_distance < 60:
-            walking_state = "걷는중"
+            walking_state = "다리사이가 조금 벌어짐"
         else:
-            walking_state = "뛰는중"
+            walking_state = ""
 
         left_knee_angle = features.get('왼쪽_무릎_각도', 0)
         right_knee_angle = features.get('오른쪽_무릎_각도', 0)
         # 자세 판단
         if left_knee_angle < 105 and right_knee_angle < 105:
-            posture = "앉아 있음"
+            posture = "앉아 있을 수 있음"
         elif foot_distance > 100:
             posture = "다리사이거리가 있음"
         else:
-            posture = "서 있음"
+            posture = ""
 
         return {
             "보행_상태": walking_state,
@@ -397,3 +400,97 @@ def check_gaze_intersection(gaze_data: Dict, yolo_objects: list, threshold: floa
     except Exception as e:
         print(f"시선 교차 확인 중 오류: {e}")
         return None
+
+
+
+def analyze_object_interactions(yolo_objects, interaction_threshold=0.5, ratio_threshold=0.5):
+    """
+    YOLO 탐지 객체와 사람 간의 상호작용 판단 및 상대적 위치 분석
+    Args:
+        yolo_objects: YOLO 탐지된 객체 리스트. 각 객체는 'bbox', 'class', 'confidence'를 포함.
+        interaction_threshold: 정규화된 거리 임계값 (사람 키 대비 거리 비율).
+        ratio_threshold: 비율 차이 임계값 (사람과 객체의 높이/너비 비율 차이).
+    Returns:
+        interactions: 상호작용 리스트 또는 예외 메시지
+    """
+    if not yolo_objects:
+        return {"error": "YOLO 객체가 탐지되지 않았습니다."}
+
+    # 중심점 계산 및 추가
+    for obj in yolo_objects:
+        bbox = obj['bbox']
+        centroid_x = (bbox[0] + bbox[2]) / 2
+        centroid_y = (bbox[1] + bbox[3]) / 2
+        obj['centroid'] = {'x': centroid_x, 'y': centroid_y}
+
+    # 사람 객체 필터링
+    human_objects = [obj for obj in yolo_objects if obj['class'] == 'person']
+    if not human_objects:
+        return {"error": "사람 객체가 탐지되지 않았습니다."}
+
+    interactions = []
+
+    # 사람 객체를 기준으로 다른 객체와의 상호작용 분석
+    for human in human_objects:
+        human_centroid = human['centroid']
+        human_bbox = human['bbox']
+
+        # 사람 크기 계산
+        human_height = human_bbox[3] - human_bbox[1]
+        human_width = human_bbox[2] - human_bbox[0]
+        human_ratio = human_height / human_width if human_width != 0 else float("inf")
+
+        for obj in yolo_objects:
+            if obj['class'] == 'person':
+                continue  # 자신과의 상호작용은 무시
+
+            # 객체 중심점 및 크기 비율 계산
+            obj_centroid = obj['centroid']
+            obj_bbox = obj['bbox']
+
+            obj_height = obj_bbox[3] - obj_bbox[1]
+            obj_width = obj_bbox[2] - obj_bbox[0]
+            obj_ratio = obj_height / obj_width if obj_width != 0 else float("inf")
+
+            # 중심점 거리 계산 및 정규화
+            distance = calculate_distance_between_points(human_centroid, obj_centroid)
+            normalized_distance = distance / human_height  # 사람 키로 거리 정규화
+
+            # 비율 차이 계산
+            ratio_difference = abs(human_ratio - obj_ratio)
+
+            # 근접 여부 판단
+            is_close = normalized_distance < interaction_threshold
+            is_similar_ratio = ratio_difference < ratio_threshold
+
+            # 상대적 위치 계산
+            dx = obj_centroid['x'] - human_centroid['x']
+            dy = obj_centroid['y'] - human_centroid['y']
+
+            if abs(dx) > abs(dy):
+                relative_position = "오른쪽" if dx > 0 else "왼쪽"
+            elif abs(dy) > abs(dx):
+                relative_position = "아래쪽" if dy > 0 else "위쪽"
+            else:
+                relative_position = "대각선"
+
+            # 상호작용 추가
+            interactions.append({
+                "human_centroid": human_centroid,
+                "object_centroid": obj_centroid,
+                "object_class": obj['class'],
+                "distance": distance,
+                "normalized_distance": normalized_distance,
+                "is_close": is_close,
+                "human_ratio": human_ratio,
+                "object_ratio": obj_ratio,
+                "ratio_difference": ratio_difference,
+                "is_similar_ratio": is_similar_ratio,
+                "relative_position": relative_position,
+                "interaction": f"사람이 {obj['class']}의 {relative_position}에 있고 {'가까움' if is_close else '멀음'}"
+            })
+
+    if not interactions:
+        return {"error": "사람 객체와 다른 객체 간의 상호작용이 감지되지 않았습니다."}
+
+    return interactions

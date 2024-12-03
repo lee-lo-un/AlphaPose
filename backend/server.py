@@ -16,7 +16,7 @@ if __name__ == "__main__":
         "app.main:app",        # 문자열 경로로 변경
         host=settings.HOST,
         port=settings.PORT,
-        reload=False,
+        reload=True,
         workers=settings.WORKERS,
         loop=settings.LOOP_TYPE
     )
