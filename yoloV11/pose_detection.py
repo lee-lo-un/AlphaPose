@@ -48,7 +48,7 @@ def process_image(image_path, detect_model, pose_model, output_folder):
     # 파일 이름 추출 (확장자 제외)
     image_name = Path(image_path).stem
 
-    # 물체 인식 ��� 포즈 추정 실행
+    # 물체 인식, 포즈 추정 실행
     detect_results = detect_model(image)
     pose_results = pose_model(image)
 
@@ -206,10 +206,14 @@ def process_single_person_with_objects(image, detect_model, pose_model):
     """
     이미지에서 가장 큰 사람의 스켈레톤 데이터를 요청하신 구조로 반환하고, 객체 데이터를 함께 반환.
     """
+    # YOLO 모델에서 클래스 이름 가져오기
+    detect_classes = detect_model.names
     with torch.cuda.amp.autocast():
         with torch.inference_mode():
             # YOLO 처리
-            detect_results = detect_model(image, conf=0.5)  # 신뢰도 임계값 설정
+            
+            detect_results = detect_model(image, conf=0.3)  # 신뢰도 임계값 설정
+            print("감지된 객체 수:", len(detect_results))  # 감지된 결과 수 출력
             pose_results = pose_model(image, conf=0.5)
             
             # 결과 저장을 위한 구조
@@ -224,7 +228,8 @@ def process_single_person_with_objects(image, detect_model, pose_model):
                 boxes = result.boxes
                 for box in boxes:
                     cls = int(box.cls[0])
-                    cls_name = COCO_CLASSES.get(cls, f"class_{cls}")
+                    cls_name = detect_classes.get(cls, f"class_{cls}")
+                    print("cls_name:", cls_name)
                     conf = float(box.conf[0])
                     coords = box.xyxy[0].cpu().numpy()
 
@@ -293,6 +298,9 @@ def main():
 
     # 모델 로드
     detect_model = YOLO('inference/yolo11l.pt')
+    print("detect_model.val(): ",detect_model.val())
+    print("detect_model.val().box: ",detect_model.val().box)
+    print("detect_model.val().box.map: ",detect_model.val().box.map)
     pose_model = YOLO('inference/yolo11l-pose.pt')
 
     # 입력/출력 폴더 설정

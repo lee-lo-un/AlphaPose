@@ -1,0 +1,23 @@
+{
+  "name": "alphapose",
+  "version": "1.0.0",
+  "description": "action inference",
+  "main": "start.js",
+  "type": "module",
+  "scripts": {
+    "start": "node start.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lee-lo-un/AlphaPose.git"
+  },
+  "keywords": [
+    "pose"
+  ],
+  "author": "leeloun",
+  "license": "UNLICENSED",
+  "bugs": {
+    "url": "https://github.com/lee-lo-un/AlphaPose/issues"
+  },
+  "homepage": "https://github.com/lee-lo-un/AlphaPose#readme"
+}

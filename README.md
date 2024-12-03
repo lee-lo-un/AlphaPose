@@ -56,6 +56,15 @@ conda create -n alphapose python=3.10 -y
 ```
 
 ## 4. 서버 실행
+
+### 방법1
+프로젝트 루트(AlphaPose 폴더)에서 초기 설치: npm install 
+```bash
+    npm start
+```
+
+### 방법2
+
 - 백엔드 실행
 
 1) 백엔드 이동 
