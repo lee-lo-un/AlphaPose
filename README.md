@@ -56,6 +56,12 @@ conda activate alphapose
     npm install
 ```
 
+### mmaction2 설치
+```bash
+   cd mmaction2
+   pip install .
+```
+
 ## 4. 서버 실행
 
 ### 방법1

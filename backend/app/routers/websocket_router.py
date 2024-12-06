@@ -76,7 +76,8 @@ async def websocket_endpoint(websocket: WebSocket):
 
             # FPS 계산 및 로깅
             total_time = time.time() - total_start
-            if frame_count % 10 == 0:
+            if frame_count % 100 == 0:
+                frame_count=0
                 fps = 1 / total_time
                 print(f"\n=== 프레임 처리 시간 분석 ===")
                 print(f"프레임 번호: {frame_count}")
